@@ -908,6 +908,40 @@ bot.command('rekap', async (ctx) => {
   }
 });
 
+bot.command('ai', async (ctx) => {
+  const chatId = ctx.chat.id;
+  const messageText = ctx.message.text;
+  const query = messageText.replace('/ai', '').trim();
+
+  if (!query) {
+    return ctx.reply('❌ Mohon ketik pertanyaan setelah perintah /ai. Contoh:\n/ai bagaimana cara menabung?');
+  }
+
+  await ctx.reply('🤖 Sedang berpikir...');
+
+  try {
+    const aiResponse = await fetch(`${process.env.BASE_URL}/api/ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: String(chatId),
+        message: query
+      })
+    });
+
+    const result = await aiResponse.json();
+
+    if (result.reply) {
+      return ctx.reply(result.reply);
+    } else {
+      throw new Error(result.error || 'Jawaban kosong');
+    }
+  } catch (err) {
+    console.error('Gagal menghubungi AI:', err);
+    ctx.reply('❌ Gagal mendapatkan balasan dari AI.');
+  }
+});
+
 // Handler untuk pesan teks (link folder)
 bot.on('text', async (ctx) => {
   const message = ctx.message.text;
@@ -1088,40 +1122,6 @@ Gunakan menu Bantuan di bawah untuk mempelajari cara mencatat keuangan.
     ctx.reply('❌ Terjadi kesalahan saat memproses folder. Silakan coba lagi.');
   }
 }
-
-bot.command('ai', async (ctx) => {
-  const chatId = ctx.chat.id;
-  const messageText = ctx.message.text;
-  const query = messageText.replace('/ai', '').trim();
-
-  if (!query) {
-    return ctx.reply('❌ Mohon ketik pertanyaan setelah perintah /ai. Contoh:\n/ai bagaimana cara menabung?');
-  }
-
-  await ctx.reply('🤖 Sedang berpikir...');
-
-  try {
-    const aiResponse = await fetch(`${process.env.BASE_URL}/api/ai`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: String(chatId),
-        message: query
-      })
-    });
-
-    const result = await aiResponse.json();
-
-    if (result.reply) {
-      return ctx.reply(result.reply);
-    } else {
-      throw new Error(result.error || 'Jawaban kosong');
-    }
-  } catch (err) {
-    console.error('Gagal menghubungi AI:', err);
-    ctx.reply('❌ Gagal mendapatkan balasan dari AI.');
-  }
-});
 
 
 // Error handler
