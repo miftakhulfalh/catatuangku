@@ -622,7 +622,7 @@ bot.hears("Rekap", async (ctx) => {
 });
 
 bot.hears("Tentang", (ctx) => {
-  const kontakMessage = `
+  const tentangMessage = `
 *Tentang Bot Pencatatan Keuangan*
 
 Bot ini membantu Anda mencatat *pengeluaran* dan *pemasukan* harian secara otomatis menggunakan Google Spreadsheet.
@@ -637,7 +637,7 @@ Bot ini membantu Anda mencatat *pengeluaran* dan *pemasukan* harian secara otoma
 📊 Data Anda disimpan aman di Google Spreadsheet pribadi Anda. 
   `;
 
-  ctx.reply(kontakMessage, { parse_mode: 'Markdown' });
+  ctx.reply(tentangMessage, { parse_mode: 'Markdown' });
 });
 
 bot.hears("Bantuan", (ctx) => {
@@ -680,7 +680,7 @@ bot.hears("Kontak", (ctx) => {
 📞 *Kontak:*
  
 💬 Helper Group: @catatanuangku_helper
-📧 Email: Email: miftahelfalh@gmail.com
+📧 Email: miftahelfalh@gmail.com
 
 
 Bot lainnya: @ArahKiblat_bot 
