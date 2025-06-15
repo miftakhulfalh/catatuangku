@@ -1,8 +1,9 @@
 // api/catat.js
-import { Telegraf, Markup } from 'telegraf';
-import { createClient } from '@supabase/supabase-js';
-import { google } from 'googleapis';
-import Groq from 'groq-sdk';
+const { Telegraf, Markup } = require('telegraf');
+const { createClient } = require('@supabase/supabase-js');
+const { google } = require('googleapis');
+const Groq = require('groq-sdk');
+
 
 // Inisialisasi bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -1098,18 +1099,18 @@ bot.catch((err, ctx) => {
 });
 
 // Handler untuk Vercel
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     if (req.method === 'POST') {
       // Handle webhook dari Telegram
       await bot.handleUpdate(req.body);
       res.status(200).json({ ok: true });
     } else {
-      // Handle GET request (untuk testing)
       res.status(200).json({ message: 'Bot is running!' });
     }
   } catch (error) {
     console.error('Handler error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-}
+};
+
