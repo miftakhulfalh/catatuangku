@@ -623,7 +623,7 @@ Bot ini membantu Anda mencatat <b>pengeluaran</b> dan <b>pemasukan</b> harian se
 • Share link folder Google Drive Anda
 • Mulai mencatat Pengeluaran dengan awalan /keluar. Contoh:
 
-<code>/keluar makan nasi padang 25rb</code>
+<blockquote>/keluar makan nasi padang 25rb</blockquote>
 atau
 <code>/keluar belanja bulanan 250 ribu</code>
 
