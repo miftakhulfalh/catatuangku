@@ -1029,7 +1029,7 @@ async function processNewFolder(ctx, folderId, firstName, folderLink, isUpdate =
     const folderAccess = await checkFolderAccess(folderId);
     if (!folderAccess.success) {
       console.error('Folder access failed:', folderAccess.error);
-      return ctx.reply('❌ Penyimpanan folder gagal. Pastikan folder dapat diakses oleh bot dan memiliki izin yang tepat.');
+      return ctx.reply('❌ Penyimpanan folder gagal. Pastikan folder sudah di share/bagikan ke email: uangku@financial-report-bot.iam.gserviceaccount.com dan memiliki izin sebagai "Editor".\n\n📌 Jika sudah merasa benar, coba kirim ulang link folder.');
     }
 
     ctx.reply('✅ Folder berhasil diakses. Sedang membuat spreadsheet...');
