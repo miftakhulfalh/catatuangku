@@ -1,7 +1,7 @@
 // api/catat.js
-const { Telegraf, Markup } = require('telegraf');
-const { createClient } = require('@supabase/supabase-js');
-const { google } = require('googleapis');
+import { Telegraf, Markup } from 'telegraf';
+import { createClient } from '@supabase/supabase-js';
+import { google } from 'googleapis';
 
 // Inisialisasi bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
