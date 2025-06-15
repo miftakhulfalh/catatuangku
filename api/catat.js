@@ -340,10 +340,14 @@ async function processNewFolder(ctx, folderId, firstName, folderLink, isUpdate =
       return ctx.reply('❌ Gagal menyimpan data pengguna. Silakan coba lagi.');
     }
 
-    // Hapus dari pending_update jika ini adalah update
-    if (isUpdate) {
-      await deletePendingUpdate(chatId);
+    // Hapus SEMUA data dengan chat_id yang sama dari pending_update
+    // (untuk user baru maupun update)
+    const deleteResult = await deletePendingUpdate(chatId);
+    if (!deleteResult.success) {
+      console.error('Failed to delete pending update:', deleteResult.error);
+      // Log error tapi jangan gagalkan proses utama
     }
+
 
     const successMessage = `
 🎉 *${isUpdate ? 'Folder berhasil diperbarui!' : 'Setup berhasil!'}* 🎉
