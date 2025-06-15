@@ -1123,20 +1123,6 @@ bot.command('ai', async (ctx) => {
   }
 });
 
-// Handler untuk webhook Vercel
-export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    try {
-      await bot.handleUpdate(req.body);
-      res.status(200).send('OK');
-    } catch (err) {
-      console.error('Webhook error:', err);
-      res.status(500).send('Bot error');
-    }
-  } else {
-    res.status(200).send('Bot is running');
-  }
-}
 
 // Error handler
 bot.catch((err, ctx) => {
