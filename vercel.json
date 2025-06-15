@@ -1,10 +1,11 @@
 {
   "version": 2,
-  "functions": {
-    "api/catat.js": {
-      "runtime": "nodejs18.x"
+  "builds": [
+    {
+      "src": "api/catat.js",
+      "use": "@vercel/node"
     }
-  },
+  ],
   "routes": [
     {
       "src": "/api/catat",
