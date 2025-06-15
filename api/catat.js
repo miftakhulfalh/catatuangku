@@ -646,8 +646,8 @@ bot.command('rekap', async (ctx) => {
 
     // Parse data ringkasan (B2:B5)
     const summaryData = data[0]?.values || [];
-    const totalPemasukan = summaryData[0] ? parseSpreadsheetNumber(summaryData[0][0]) : 0;
-    const totalPengeluaran = summaryData[1] ? parseSpreadsheetNumber(summaryData[1][0]) : 0;
+    const totalPengeluaran = summaryData[0] ? parseSpreadsheetNumber(summaryData[0][0]) : 0;
+    const totalPemasukan = summaryData[1] ? parseSpreadsheetNumber(summaryData[1][0]) : 0;
     const saldoAkhir = summaryData[2] ? parseSpreadsheetNumber(summaryData[2][0]) : 0;
 
     // Parse data pengeluaran terakhir
