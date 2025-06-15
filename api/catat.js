@@ -310,6 +310,11 @@ bot.action('replace_no', async (ctx) => {
   }
 });
 
+// Fungsi helper untuk delay
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Fungsi untuk memproses folder baru
 async function processNewFolder(ctx, folderId, firstName, folderLink, isUpdate = false) {
   try {
@@ -332,14 +337,16 @@ async function processNewFolder(ctx, folderId, firstName, folderLink, isUpdate =
       console.error('Template copy failed:', copyResult.error);
       return ctx.reply('❌ Gagal membuat spreadsheet catatan keuangan. Silakan coba lagi.');
     }
-
+    console.log('✅ Template copied successfully');
+    
     // Simpan ke database users
     const saveResult = await saveOrUpdateUser(chatId, firstName, folderLink, copyResult.url);
     if (!saveResult.success) {
       console.error('Failed to save user:', saveResult.error);
       return ctx.reply('❌ Gagal menyimpan data pengguna. Silakan coba lagi.');
     }
-
+     console.log('✅ User data saved successfully');
+    
     // Hapus SEMUA data dengan chat_id yang sama dari pending_update
     // (untuk user baru maupun update)
     const deleteResult = await deletePendingUpdate(chatId);
@@ -347,7 +354,9 @@ async function processNewFolder(ctx, folderId, firstName, folderLink, isUpdate =
       console.error('Failed to delete pending update:', deleteResult.error);
       // Log error tapi jangan gagalkan proses utama
     }
+    console.log('✅ Pending update deleted successfully');
 
+    await delay(1000);
 
     const successMessage = `
 🎉 *${isUpdate ? 'Folder berhasil diperbarui!' : 'Setup berhasil!'}* 🎉
@@ -363,7 +372,9 @@ ${copyResult.url}
 💡 *Tips:* Bookmark link spreadsheet di atas untuk akses yang lebih mudah!
     `;
 
-    ctx.replyWithMarkdown(successMessage);
+    console.log('📤 Sending success message...');
+    await ctx.replyWithMarkdown(successMessage);
+    console.log('✅ Success message sent');
 
   } catch (error) {
     console.error('Error in processNewFolder:', error);
