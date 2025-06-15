@@ -612,6 +612,40 @@ bot.hears("Rekap", async (ctx) => {
   }
 });
 
+bot.hears("Bantuan", (ctx) => {
+  const bantuanMessage = `
+<b>Bantuan</b>
+
+Bot ini membantu Anda mencatat <b>pengeluaran</b> dan <b>pemasukan</b> harian secara otomatis menggunakan Google Spreadsheet.
+
+🧰 <b>Cara Penggunaan:</b>
+• Share link folder Google Drive Anda
+• Mulai mencatat Pengeluaran dengan awalan /keluar. Contoh:
+
+<code>/keluar makan nasi padang 25rb</code>
+atau
+<code>/keluar belanja bulanan 250 ribu</code>
+
+• Untuk mencatat Pemasukan/pendapatan dengan awalan /masuk. Contoh:
+
+<code>/masuk gaji bulanan 5jt</code>
+atau
+<code>/masuk freelance desain grafis 500rb</code>
+
+• Untuk mencatat pengeluaran dengan foto struk, kirimkan foto struk Anda dan bot akan otomatis menganalisisnya
+• Lihat Rekap bulanan Anda dengan perintah /rekap atau tombol <b>Rekap</b> di bawah
+• Gunakan awalan /ai untuk memulai berinteraksi dengan AI seputar keuangan
+
+📷 Panduan: https://i.ibb.co/RkYbg2Z2/panduan.png
+
+📊 Data Anda disimpan aman di Google Spreadsheet pribadi Anda.
+
+Jika ada kendala hubungi <a href="https://t.me/catatanuangku_helper">@catatanuangku_helper</a>
+  `;
+
+  ctx.reply(bantuanMessage, { parse_mode: 'HTML' });
+});
+
 // Handler untuk perintah /keluar (pengeluaran)
 bot.command('keluar', async (ctx) => {
   const chatId = ctx.chat.id;
