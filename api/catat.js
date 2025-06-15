@@ -663,6 +663,34 @@ Bot ini membantu Anda mencatat <b>pengeluaran</b> dan <b>pemasukan</b> harian se
   ctx.reply(message, { parse_mode: 'HTML' });
 });
 
+bot.hears("Kontak", (ctx) => {
+  const message = `
+<b>Kontak Pengembang</b>
+
+💬 Helper Group: @catatanuangku_helper
+📧 Email: Email: miftahelfalh@gmail.com
+  `;
+  ctx.reply(message, { parse_mode: 'HTML' });
+});
+
+bot.hears("Support", (ctx) => {
+  const photoUrl = 'https://i.ibb.co/nxDfXfK/saweria.jpg';
+  const caption = `
+<b>Bantu Support</b>
+
+Dukung biaya server dan pengembangan bot ini melalui QR code di atas atau tautan berikut:
+
+<a href="https://saweria.co/miftakhulfalh">https://saweria.co/miftakhulfalh</a>
+
+Terima kasih telah menggunakan bot ini 🙏🙏🙏
+  `;
+
+  ctx.replyWithPhoto({ url: photoUrl }, {
+    caption,
+    parse_mode: 'HTML'
+  });
+});
+
 // Handler untuk perintah /keluar (pengeluaran)
 bot.command('keluar', async (ctx) => {
   const chatId = ctx.chat.id;
