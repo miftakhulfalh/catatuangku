@@ -6,6 +6,20 @@
       "use": "@vercel/node"
     }
   ],
+  "routes": [
+    {
+      "src": "^/$",
+      "dest": "/api/catat.js"
+    },
+    {
+      "src": "^/api/catat$",
+      "dest": "/api/catat.js"
+    },
+    {
+      "src": "^/api/ai$",
+      "dest": "/api/ai.js"
+    }
+  ],
   "env": {
     "NODE_ENV": "production"
   }
