@@ -3,6 +3,7 @@ import { Telegraf, Markup } from 'telegraf';
 import { createClient } from '@supabase/supabase-js';
 import { google } from 'googleapis';
 import Groq from 'groq-sdk';
+import fetch from 'node-fetch';
 
 // Inisialisasi bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -1085,6 +1086,55 @@ Gunakan menu Bantuan di bawah untuk mempelajari cara mencatat keuangan.
   } catch (error) {
     console.error('Error in processNewFolder:', error);
     ctx.reply('❌ Terjadi kesalahan saat memproses folder. Silakan coba lagi.');
+  }
+}
+
+bot.command('ai', async (ctx) => {
+  const chatId = ctx.chat.id;
+  const messageText = ctx.message.text;
+  const query = messageText.replace('/ai', '').trim();
+
+  if (!query) {
+    return ctx.reply('❌ Mohon ketik pertanyaan setelah perintah /ai. Contoh:\n/ai bagaimana cara menabung?');
+  }
+
+  await ctx.reply('🤖 Sedang berpikir...');
+
+  try {
+    const aiResponse = await fetch(`${process.env.BASE_URL}/api/ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: String(chatId),
+        message: query
+      })
+    });
+
+    const result = await aiResponse.json();
+
+    if (result.reply) {
+      return ctx.reply(result.reply);
+    } else {
+      throw new Error(result.error || 'Jawaban kosong');
+    }
+  } catch (err) {
+    console.error('Gagal menghubungi AI:', err);
+    ctx.reply('❌ Gagal mendapatkan balasan dari AI.');
+  }
+});
+
+// Handler untuk webhook Vercel
+export default async function handler(req, res) {
+  if (req.method === 'POST') {
+    try {
+      await bot.handleUpdate(req.body);
+      res.status(200).send('OK');
+    } catch (err) {
+      console.error('Webhook error:', err);
+      res.status(500).send('Bot error');
+    }
+  } else {
+    res.status(200).send('Bot is running');
   }
 }
 
