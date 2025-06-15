@@ -210,6 +210,8 @@ Tipe: "${type === 'keluar' ? 'Pengeluaran' : 'Pendapatan'}"
 
 Instruksi:
 1. Ekstrak jumlah uang dari pesan (hapus kata seperti "rb", "ribu", "juta", dll dan konversi ke angka)
+   - "rb" atau "ribu" = x1000
+   - "jt" atau "juta" = x1000000
 2. Tentukan kategori yang sesuai
 3. Ekstrak keterangan/deskripsi
 4. Jika tidak ada tanggal dalam pesan, gunakan tanggal hari ini: ${currentDate}
@@ -233,20 +235,24 @@ Kategori untuk Pendapatan:
 - Bisnis
 - Pendapatan Lainnya
 
+PENTING: Berikan HANYA output JSON yang valid, tanpa teks tambahan, komentar, atau penjelasan apapun.
+
 Format output JSON:
 {
   "klasifikasi": "${type === 'keluar' ? 'Pengeluaran' : 'Pendapatan'}",
   "kategori": "kategori_yang_sesuai",
   "jumlah": jumlah_dalam_angka,
   "keterangan": "deskripsi_singkat",
-  "tanggal": "YYYY-MM-DD"
+  "tanggal": "${currentDate}"
 }
-
-Berikan HANYA output JSON, tanpa teks tambahan apapun.
     `;
 
     const completion = await groq.chat.completions.create({
       messages: [
+        {
+          role: "system",
+          content: "You are a financial transaction classifier. Return ONLY valid JSON without any additional text, comments, or explanations."
+        },
         {
           role: "user",
           content: prompt
@@ -254,18 +260,136 @@ Berikan HANYA output JSON, tanpa teks tambahan apapun.
       ],
       model: "llama3-8b-8192",
       temperature: 0.1,
-      max_tokens: 500,
+      max_tokens: 300,
     });
 
-    const response = completion.choices[0]?.message?.content?.trim();
-    console.log('Groq AI Response:', response);
+    let response = completion.choices[0]?.message?.content?.trim();
+    console.log('Groq AI Raw Response:', response);
 
-    // Parse JSON response
-    const parsed = JSON.parse(response);
+    // Clean response - remove any markdown code blocks or extra text
+    if (response.includes('```json')) {
+      response = response.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    }
+    if (response.includes('```')) {
+      response = response.replace(/```/g, '');
+    }
+
+    // Find JSON object in response
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      response = jsonMatch[0];
+    }
+
+    console.log('Cleaned Response for parsing:', response);
+
+    // Try to parse JSON
+    let parsed;
+    try {
+      parsed = JSON.parse(response);
+    } catch (parseError) {
+      console.error('JSON Parse Error:', parseError);
+      console.error('Failed to parse response:', response);
+      
+      // Fallback: create manual classification
+      return await fallbackClassification(message, type, currentDate);
+    }
+
+    // Validate required fields
+    if (!parsed.klasifikasi || !parsed.kategori || !parsed.jumlah || !parsed.keterangan || !parsed.tanggal) {
+      console.error('Missing required fields in parsed response:', parsed);
+      return await fallbackClassification(message, type, currentDate);
+    }
+
     return { success: true, data: parsed };
 
   } catch (error) {
     console.error('Error in AI classification:', error);
+    
+    // Fallback classification
+    try {
+      const currentDate = new Date().toISOString().split('T')[0];
+      return await fallbackClassification(message, type, currentDate);
+    } catch (fallbackError) {
+      console.error('Fallback classification also failed:', fallbackError);
+      return { success: false, error: error.message };
+    }
+  }
+}
+
+// Fungsi fallback untuk klasifikasi manual
+async function fallbackClassification(message, type, currentDate) {
+  try {
+    console.log('Using fallback classification for message:', message);
+    
+    // Extract amount
+    let amount = 0;
+    const amountRegex = /(\d+(?:\.\d+)?)\s*(rb|ribu|jt|juta|k)?/i;
+    const amountMatch = message.match(amountRegex);
+    
+    if (amountMatch) {
+      let num = parseFloat(amountMatch[1]);
+      const unit = amountMatch[2]?.toLowerCase();
+      
+      if (unit === 'rb' || unit === 'ribu' || unit === 'k') {
+        num *= 1000;
+      } else if (unit === 'jt' || unit === 'juta') {
+        num *= 1000000;
+      }
+      
+      amount = Math.round(num);
+    }
+
+    // Simple category classification
+    let category;
+    const lowerMessage = message.toLowerCase();
+    
+    if (type === 'keluar') {
+      if (lowerMessage.includes('makan') || lowerMessage.includes('minum') || lowerMessage.includes('nasi') || lowerMessage.includes('sate') || lowerMessage.includes('kopi')) {
+        category = 'Makanan & Minuman';
+      } else if (lowerMessage.includes('bensin') || lowerMessage.includes('ojek') || lowerMessage.includes('taxi') || lowerMessage.includes('bus')) {
+        category = 'Transportasi';
+      } else if (lowerMessage.includes('motor') || lowerMessage.includes('mobil') || lowerMessage.includes('service')) {
+        category = 'Kendaraan';
+      } else if (lowerMessage.includes('beli') || lowerMessage.includes('belanja') || lowerMessage.includes('baju') || lowerMessage.includes('sepatu')) {
+        category = 'Belanja';
+      } else {
+        category = 'Pengeluaran Lainnya';
+      }
+    } else {
+      if (lowerMessage.includes('gaji') || lowerMessage.includes('salary')) {
+        category = 'Gaji';
+      } else if (lowerMessage.includes('bonus')) {
+        category = 'Bonus';
+      } else if (lowerMessage.includes('freelance') || lowerMessage.includes('project')) {
+        category = 'Freelance';
+      } else {
+        category = 'Pendapatan Lainnya';
+      }
+    }
+
+    // Extract description (remove amount and common words)
+    let description = message
+      .replace(amountRegex, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!description) {
+      description = type === 'keluar' ? 'Pengeluaran' : 'Pendapatan';
+    }
+
+    const result = {
+      klasifikasi: type === 'keluar' ? 'Pengeluaran' : 'Pendapatan',
+      kategori: category,
+      jumlah: amount,
+      keterangan: description,
+      tanggal: currentDate
+    };
+
+    console.log('Fallback classification result:', result);
+    return { success: true, data: result };
+
+  } catch (error) {
+    console.error('Error in fallback classification:', error);
     return { success: false, error: error.message };
   }
 }
