@@ -13,11 +13,21 @@ const supabase = createClient(
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { userId, message } = req.body;
+  try {
+    const buffers = [];
 
-  if (!userId || !message) {
-    return res.status(400).json({ error: 'userId dan message wajib.' });
-  }
+    for await (const chunk of req) {
+      buffers.push(chunk);
+    }
+
+    const rawBody = Buffer.concat(buffers).toString();
+    const body = JSON.parse(rawBody); // ⬅️ aman sekarang
+
+    const { userId, message } = body;
+
+    if (!userId || !message) {
+      return res.status(400).json({ error: 'userId dan message wajib.' });
+    }
 
   try {
     // Ambil riwayat chat user (max 10 terakhir)
