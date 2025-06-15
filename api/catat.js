@@ -625,13 +625,13 @@ Bot ini membantu Anda mencatat <b>pengeluaran</b> dan <b>pemasukan</b> harian se
 
 <blockquote>/keluar makan nasi padang 25rb</blockquote>
 atau
-<code>/keluar belanja bulanan 250 ribu</code>
+<blockquote>/keluar belanja bulanan 250 ribu</blockquote>
 
 • Untuk mencatat Pemasukan/pendapatan dengan awalan /masuk. Contoh:
 
-<code>/masuk gaji bulanan 5jt</code>
+<blockquote>/masuk gaji bulanan 5jt</blockquote>
 atau
-<code>/masuk freelance desain grafis 500rb</code>
+<blockquote>/masuk freelance desain grafis 500rb</blockquote>
 
 • Untuk mencatat pengeluaran dengan foto struk, kirimkan foto struk Anda dan bot akan otomatis menganalisisnya
 • Lihat Rekap bulanan Anda dengan perintah /rekap atau tombol <b>Rekap</b> di bawah
