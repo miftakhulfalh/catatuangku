@@ -910,29 +910,26 @@ bot.catch((err, ctx) => {
   ctx.reply('❌ Terjadi kesalahan pada bot. Silakan coba lagi.');
 });
 
+bot.launch();
+
 // Handler untuk Vercel
 module.exports = async (req, res) => {
   try {
     if (req.method === 'POST') {
-      // Pastikan body berbentuk JSON
-      if (typeof req.body === 'string') {
-        req.body = JSON.parse(req.body);
-      }
-      
       await bot.handleUpdate(req.body);
-      return res.status(200).json({ status: 'success' });
+      return res.status(200).json({ ok: true });
     } 
-    
-    // GET request untuk verifikasi
-    return res.status(200).send(`
-      <h1>Catat Bot API</h1>
-      <p>Endpoint aktif. Gunakan POST request untuk webhook Telegram.</p>
-    `);
+    return res.status(200).json({ 
+      status: 'active',
+      message: 'Bot API is running',
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    console.error('Handler error:', error);
+    console.error('Global handler error:', error);
     return res.status(500).json({ 
       error: 'Internal server error',
-      message: error.message 
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
