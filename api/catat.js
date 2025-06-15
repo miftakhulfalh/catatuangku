@@ -217,7 +217,8 @@ Instruksi:
 4. Jika tidak ada tanggal dalam pesan, gunakan tanggal hari ini: ${currentDate}
 
 Kategori untuk Pengeluaran:
-- Makanan & Minuman
+- Makanan
+- Minuman
 - Transportasi
 - Kendaraan
 - Belanja
@@ -231,6 +232,8 @@ Kategori untuk Pendapatan:
 - Gaji
 - Bonus
 - Freelance
+- Transfer
+- Hadiah
 - Investasi
 - Bisnis
 - Pendapatan Lainnya
@@ -425,6 +428,35 @@ async function writeToSpreadsheet(spreadsheetId, sheetName, data) {
   }
 }
 
+// Fungsi untuk membaca data dari spreadsheet
+async function readFromSpreadsheet(spreadsheetId, ranges) {
+  try {
+    const result = await sheets.spreadsheets.values.batchGet({
+      spreadsheetId: spreadsheetId,
+      ranges: ranges
+    });
+
+    console.log('Data read from spreadsheet:', result.data);
+    return { success: true, data: result.data };
+
+  } catch (error) {
+    console.error('Error reading from spreadsheet:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Fungsi untuk memformat angka dari spreadsheet
+function parseSpreadsheetNumber(value) {
+  if (!value) return 0;
+  
+  // Jika sudah berupa angka
+  if (typeof value === 'number') return value;
+  
+  // Jika berupa string, hapus format currency dan konversi ke angka
+  let cleanValue = value.toString().replace(/[^0-9.-]/g, '');
+  return parseFloat(cleanValue) || 0;
+}
+
 // Fungsi untuk memformat currency
 function formatCurrency(amount) {
   return new Intl.NumberFormat('id-ID', {
@@ -572,6 +604,106 @@ bot.command('masuk', async (ctx) => {
   } catch (error) {
     console.error('Error in /masuk handler:', error);
     ctx.reply('❌ Terjadi kesalahan saat mencatat pendapatan. Silakan coba lagi.');
+  }
+});
+
+// Handler untuk perintah /rekap (rekap bulanan)
+bot.command('rekap', async (ctx) => {
+  const chatId = ctx.chat.id;
+
+  try {
+    // Cek apakah user sudah terdaftar
+    const userCheck = await checkUserExists(chatId);
+    if (!userCheck.success || !userCheck.exists) {
+      return ctx.reply('❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
+    }
+
+    const userData = userCheck.data;
+    const spreadsheetId = extractSpreadsheetIdFromUrl(userData.spreadsheet_link);
+
+    if (!spreadsheetId) {
+      return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
+    }
+
+    ctx.reply('⏳ Sedang mengambil data rekap...');
+
+    // Ranges yang akan dibaca
+    const ranges = [
+      'Dashboard!B2:B5',      // Total Pemasukan, Pengeluaran, Saldo
+      'Dashboard!N4:N8',      // Kategori pengeluaran terakhir
+      'Dashboard!O4:O8',      // Jumlah pengeluaran terakhir
+      'Dashboard!Q4:Q8',      // Kategori pendapatan terakhir
+      'Dashboard!R4:R8'       // Jumlah pendapatan terakhir
+    ];
+
+    const readResult = await readFromSpreadsheet(spreadsheetId, ranges);
+    if (!readResult.success) {
+      console.error('Read from spreadsheet failed:', readResult.error);
+      return ctx.reply('❌ Gagal mengambil data rekap. Pastikan spreadsheet dapat diakses.');
+    }
+
+    const data = readResult.data.valueRanges;
+
+    // Parse data ringkasan (B2:B5)
+    const summaryData = data[0]?.values || [];
+    const totalPemasukan = summaryData[0] ? parseSpreadsheetNumber(summaryData[0][0]) : 0;
+    const totalPengeluaran = summaryData[1] ? parseSpreadsheetNumber(summaryData[1][0]) : 0;
+    const saldoAkhir = summaryData[2] ? parseSpreadsheetNumber(summaryData[2][0]) : 0;
+
+    // Parse data pengeluaran terakhir
+    const pengeluaranKategori = data[1]?.values || [];
+    const pengeluaranJumlah = data[2]?.values || [];
+
+    // Parse data pendapatan terakhir
+    const pendapatanKategori = data[3]?.values || [];
+    const pendapatanJumlah = data[4]?.values || [];
+
+    // Format pesan rekap
+    let rekapMessage = `
+📊 *REKAP KEUANGAN BULANAN* 📊
+
+💰 *Ringkasan:*
+💵 Total Pemasukan: ${formatCurrency(totalPemasukan)}
+💸 Total Pengeluaran: ${formatCurrency(totalPengeluaran)}
+💳 Saldo Akhir: ${formatCurrency(saldoAkhir)}
+
+`;
+
+    // Tambahkan rincian pengeluaran terakhir
+    if (pengeluaranKategori.length > 0) {
+      rekapMessage += `🔴 *Rincian Pengeluaran Terakhir:*\n`;
+      for (let i = 0; i < Math.min(pengeluaranKategori.length, 5); i++) {
+        const kategori = pengeluaranKategori[i] ? pengeluaranKategori[i][0] : '';
+        const jumlah = pengeluaranJumlah[i] ? parseSpreadsheetNumber(pengeluaranJumlah[i][0]) : 0;
+        
+        if (kategori && jumlah > 0) {
+          rekapMessage += `${i + 1}. ${kategori}: ${formatCurrency(jumlah)}\n`;
+        }
+      }
+      rekapMessage += '\n';
+    }
+
+    // Tambahkan rincian pendapatan terakhir
+    if (pendapatanKategori.length > 0) {
+      rekapMessage += `🟢 *Rincian Pendapatan Terakhir:*\n`;
+      for (let i = 0; i < Math.min(pendapatanKategori.length, 5); i++) {
+        const kategori = pendapatanKategori[i] ? pendapatanKategori[i][0] : '';
+        const jumlah = pendapatanJumlah[i] ? parseSpreadsheetNumber(pendapatanJumlah[i][0]) : 0;
+        
+        if (kategori && jumlah > 0) {
+          rekapMessage += `${i + 1}. ${kategori}: ${formatCurrency(jumlah)}\n`;
+        }
+      }
+    }
+
+    // Tambahkan link spreadsheet
+    rekapMessage += `\n🔗 [Lihat Detail Spreadsheet](${userData.spreadsheet_link})`;
+
+    await ctx.replyWithMarkdown(rekapMessage);
+
+  } catch (error) {
+    console.error('Error in /rekap handler:', error);
+    ctx.reply('❌ Terjadi kesalahan saat mengambil rekap. Silakan coba lagi.');
   }
 });
 
