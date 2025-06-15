@@ -501,7 +501,7 @@ Silakan kirimkan link folder Google Drive Anda untuk memulai! 📁
       one_time_keyboard: false
     }
   });
-});
+
 
 bot.hears("Buka Spreadsheet", async (ctx) => {
   const chatId = ctx.chat.id;
