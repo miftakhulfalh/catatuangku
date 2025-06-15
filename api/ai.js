@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     if (error) throw error;
 
     const messages = [
-      { role: 'system', content: 'You are a helpful assistant.' },
+      { role: 'system', content: 'Kamu adalah asisten yang sangat kompeten. Jawab sesuai dengan bahasa yang digunakan oleh user, utamakan Bahasa Indonesia. Jawab semua pertanyaan atau pernyataan, terutama yang berkaitan dengan keuangan.' },
       ...(history || []),
       { role: 'user', content: message }
     ];
