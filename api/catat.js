@@ -646,6 +646,23 @@ Jika ada kendala hubungi <a href="https://t.me/catatanuangku_helper">@catatanuan
   ctx.reply(bantuanMessage, { parse_mode: 'HTML' });
 });
 
+bot.hears("Tentang", (ctx) => {
+  const message = `
+<b>Tentang Bot</b>
+
+Bot ini membantu Anda mencatat <b>pengeluaran</b> dan <b>pemasukan</b> harian secara otomatis menggunakan Google Spreadsheet.
+ <b>Fitur Utama:</b>
+• Tambah catatan keuangan via chat
+• Tambah catatan keuangan via foto struk
+• Rekap pengeluaran dan pemasukan bulanan  
+• Dukungan multi-user (tiap user punya spreadsheet sendiri)  
+• AI chat Keuangan  
+
+📊 Data Anda disimpan aman di Google Spreadsheet pribadi Anda.
+  `;
+  ctx.reply(message, { parse_mode: 'HTML' });
+});
+
 // Handler untuk perintah /keluar (pengeluaran)
 bot.command('keluar', async (ctx) => {
   const chatId = ctx.chat.id;
