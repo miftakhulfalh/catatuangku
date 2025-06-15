@@ -910,11 +910,16 @@ bot.command('rekap', async (ctx) => {
 
 bot.command('ai', async (ctx) => {
   const chatId = ctx.chat.id;
-  const messageText = ctx.message.text;
+  const messageText = ctx.message?.text;
+  
+  if (!messageText) {
+    return ctx.reply('❌ Format salah. Silakan ketik perintah seperti:\n/ai bagaimana cara menabung?');
+  }
+
   const query = messageText.replace('/ai', '').trim();
 
   if (!query) {
-    return ctx.reply('❌ Mohon ketik pertanyaan setelah perintah /ai. Contoh:\n/ai bagaimana cara menabung?');
+    return ctx.reply('❌ Mohon ketik pertanyaan setelah perintah /ai.');
   }
 
   await ctx.reply('🤖 Sedang berpikir...');
