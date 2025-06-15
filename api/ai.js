@@ -14,14 +14,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
+    // 🔧 ambil raw body dan parse JSON
     const buffers = [];
-
-    for await (const chunk of req) {
-      buffers.push(chunk);
-    }
-
+    for await (const chunk of req) buffers.push(chunk);
     const rawBody = Buffer.concat(buffers).toString();
-    const body = JSON.parse(rawBody); // ⬅️ aman sekarang
+    const body = JSON.parse(rawBody);
 
     const { userId, message } = body;
 
@@ -29,8 +26,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'userId dan message wajib.' });
     }
 
-  try {
-    // Ambil riwayat chat user (max 10 terakhir)
+    // ✅ Ambil riwayat chat user
     const { data: history, error } = await supabase
       .from('chat_memory')
       .select('role, content')
@@ -53,15 +49,16 @@ export default async function handler(req, res) {
 
     const reply = completion.choices?.[0]?.message?.content || '(tidak ada balasan)';
 
-    // Simpan ke memory
+    // ✅ Simpan pesan ke Supabase
     await supabase.from('chat_memory').insert([
       { user_id: userId, role: 'user', content: message },
       { user_id: userId, role: 'assistant', content: reply }
     ]);
 
-    res.status(200).json({ reply });
+    return res.status(200).json({ reply });
+
   } catch (err) {
     console.error('AI error:', err);
-    res.status(500).json({ error: 'Gagal memproses permintaan AI.' });
+    return res.status(500).json({ error: 'Gagal memproses permintaan AI.' });
   }
 }
