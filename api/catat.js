@@ -1073,6 +1073,7 @@ async function processNewFolder(ctx, folderId, firstName, folderLink, isUpdate =
 ${copyResult.url}
 
 ✅ Anda sekarang dapat mulai mencatat keuangan pribadi menggunakan spreadsheet tersebut.
+Gunakan menu Bantuan di bawah untuk mempelajari cara mencatat keuangan.
 
 💡 *Tips:* Bookmark link spreadsheet di atas untuk akses yang lebih mudah!
     `;
