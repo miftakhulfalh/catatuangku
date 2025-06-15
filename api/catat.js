@@ -689,19 +689,6 @@ Bot lainnya: @ArahKiblat_bot
   ctx.reply(kontakMessage, { parse_mode: 'Markdown' });
 });
 
-bot.hears("Support", (ctx) => {
-  const supportMessage = `
-*Bantu support Saweria* untuk biaya server lewat QR code di atas  
-atau link: [https://saweria.co/miftakhulfalh](https://saweria.co/miftakhulfalh)
-
-Terima kasih telah menggunakan bot ini 🙏🙏🙏
-  `;
-
-  ctx.reply(supportMessage, { parse_mode: 'Markdown' });
-});
-
-
-
 
 // Handler untuk perintah /keluar (pengeluaran)
 bot.command('keluar', async (ctx) => {
