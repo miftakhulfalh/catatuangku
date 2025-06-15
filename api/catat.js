@@ -396,21 +396,10 @@ async function fallbackClassification(message, type, currentDate) {
 
 // Fungsi untuk menulis ke spreadsheet
 async function writeToSpreadsheet(spreadsheetId, sheetName, data) {
-  try {
-    
-    // Konversi tanggal string ke format yang bisa dikenali Google Sheets
-    let dateValue = data.tanggal;
-    
-    // Jika tanggal dalam format YYYY-MM-DD, konversi ke Date object
-    if (typeof dateValue === 'string' && dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      // Buat Date object dari string YYYY-MM-DD
-      const dateParts = dateValue.split('-');
-      dateValue = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
-    }
-    
+  try {    
     // Data yang akan ditulis ke spreadsheet
     const values = [[
-      dateValue,
+      data.tanggal,
       data.kategori,
       data.jumlah,
       data.keterangan
