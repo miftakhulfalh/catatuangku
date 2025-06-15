@@ -1,9 +1,8 @@
 // api/catat.js
-const { Telegraf, Markup } = require('telegraf');
-const { createClient } = require('@supabase/supabase-js');
-const { google } = require('googleapis');
-const Groq = require('groq-sdk');
-
+import { Telegraf, Markup } from 'telegraf';
+import { createClient } from '@supabase/supabase-js';
+import { google } from 'googleapis';
+import Groq from 'groq-sdk';
 
 // Inisialisasi bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -218,8 +217,7 @@ Instruksi:
 4. Jika tidak ada tanggal dalam pesan, gunakan tanggal hari ini: ${currentDate}
 
 Kategori untuk Pengeluaran:
-- Makanan
-- Minuman
+- Makanan & Minuman
 - Transportasi
 - Kendaraan
 - Belanja
@@ -233,8 +231,6 @@ Kategori untuk Pendapatan:
 - Gaji
 - Bonus
 - Freelance
-- Transfer
-- Hadiah
 - Investasi
 - Bisnis
 - Pendapatan Lainnya
@@ -400,7 +396,7 @@ async function fallbackClassification(message, type, currentDate) {
 
 // Fungsi untuk menulis ke spreadsheet
 async function writeToSpreadsheet(spreadsheetId, sheetName, data) {
-  try {    
+  try {
     // Data yang akan ditulis ke spreadsheet
     const values = [[
       data.tanggal,
@@ -416,7 +412,7 @@ async function writeToSpreadsheet(spreadsheetId, sheetName, data) {
     const result = await sheets.spreadsheets.values.append({
       spreadsheetId: spreadsheetId,
       range: `${sheetName}!A:D`, // Assuming columns A-D (Tanggal, Kategori, Jumlah, Keterangan)
-      valueInputOption: 'USER_ENTERED',
+      valueInputOption: 'RAW',
       resource: resource
     });
 
@@ -427,35 +423,6 @@ async function writeToSpreadsheet(spreadsheetId, sheetName, data) {
     console.error('Error writing to spreadsheet:', error);
     return { success: false, error: error.message };
   }
-}
-
-// Fungsi untuk membaca data dari spreadsheet
-async function readFromSpreadsheet(spreadsheetId, ranges) {
-  try {
-    const result = await sheets.spreadsheets.values.batchGet({
-      spreadsheetId: spreadsheetId,
-      ranges: ranges
-    });
-
-    console.log('Data read from spreadsheet:', result.data);
-    return { success: true, data: result.data };
-
-  } catch (error) {
-    console.error('Error reading from spreadsheet:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-// Fungsi untuk memformat angka dari spreadsheet
-function parseSpreadsheetNumber(value) {
-  if (!value) return 0;
-  
-  // Jika sudah berupa angka
-  if (typeof value === 'number') return value;
-  
-  // Jika berupa string, hapus format currency dan konversi ke angka
-  let cleanValue = value.toString().replace(/[^0-9.-]/g, '');
-  return parseFloat(cleanValue) || 0;
 }
 
 // Fungsi untuk memformat currency
@@ -475,13 +442,9 @@ bot.start((ctx) => {
 Bot ini akan membantu Anda mengelola catatan keuangan pribadi menggunakan Google Spreadsheet.
 
 📋 *Cara penggunaan:*
-1. Buat folder baru di Google Drive kamu
-2. Bagikan/share folder tersebut ke email \`uangku@financial-report-bot.iam.gserviceaccount.com\` share sebagai "Editor"
-3. Copy link folder kamu
-4. Paste atau kirim link folder kamu.
-
-🔗[Cara share folder Google Drive](https://i.ibb.co/XxtL7d4m/cara-share-folder.png)
-
+1. Kirimkan link folder Google Drive Anda
+2. Bot akan membuat file spreadsheet catatan keuangan di folder tersebut
+3. Anda bisa mulai mencatat keuangan menggunakan spreadsheet yang telah dibuat
 
 ⚠️ *Pastikan:*
 - Link yang dikirim adalah link folder Google Drive (bukan file)
@@ -491,205 +454,8 @@ Bot ini akan membantu Anda mengelola catatan keuangan pribadi menggunakan Google
 Silakan kirimkan link folder Google Drive Anda untuk memulai! 📁
   `;
 
-  ctx.reply(welcomeMessage, {
-    parse_mode: 'Markdown',
-    reply_markup: {
-      keyboard: [
-        ['Buka Spreadsheet', 'Rekap', 'Bantuan'],
-        ['Tentang', 'Kontak', 'Support']
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: false
-    }
-  });
-
-
-bot.hears("Buka Spreadsheet", async (ctx) => {
-  const chatId = ctx.chat.id;
-
-  // Cek apakah user sudah terdaftar
-  const userCheck = await checkUserExists(chatId);
-  if (!userCheck.success || !userCheck.exists) {
-    return ctx.reply('❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
-  }
-
-  const spreadsheetLink = userCheck.data.spreadsheet_link;
-
-  if (!spreadsheetLink) {
-    return ctx.reply('❌ Link spreadsheet belum tersedia. Silakan setup ulang dengan mengirimkan link folder.');
-  }
-
-  return ctx.reply(`🔗 Berikut link spreadsheet Anda:\n${spreadsheetLink}`);
+  ctx.replyWithMarkdown(welcomeMessage);
 });
-
-bot.hears("Rekap", async (ctx) => {
-  const chatId = ctx.chat.id;
-
-  try {
-    // Cek apakah user sudah terdaftar
-    const userCheck = await checkUserExists(chatId);
-    if (!userCheck.success || !userCheck.exists) {
-      return ctx.reply('❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
-    }
-
-    const userData = userCheck.data;
-    const spreadsheetId = extractSpreadsheetIdFromUrl(userData.spreadsheet_link);
-
-    if (!spreadsheetId) {
-      return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
-    }
-
-    await ctx.reply('⏳ Sedang mengambil data rekap...');
-
-    // Ranges yang akan dibaca
-    const ranges = [
-      'Dashboard!B2:B5',      // Pengeluaran, Pemasukan, Saldo
-      'Dashboard!N4:N8',      // Kategori pengeluaran terakhir
-      'Dashboard!O4:O8',      // Jumlah pengeluaran terakhir
-      'Dashboard!Q4:Q8',      // Kategori pendapatan terakhir
-      'Dashboard!R4:R8'       // Jumlah pendapatan terakhir
-    ];
-
-    const readResult = await readFromSpreadsheet(spreadsheetId, ranges);
-    if (!readResult.success) {
-      console.error('Read from spreadsheet failed:', readResult.error);
-      return ctx.reply('❌ Gagal mengambil data rekap. Pastikan spreadsheet dapat diakses.');
-    }
-
-    const data = readResult.data.valueRanges;
-
-    // Parse data ringkasan (B2:B5)
-    const summaryData = data[0]?.values || [];
-    const totalPengeluaran = summaryData[0] ? parseSpreadsheetNumber(summaryData[0][0]) : 0;
-    const totalPemasukan = summaryData[1] ? parseSpreadsheetNumber(summaryData[1][0]) : 0;
-    const saldoAkhir = summaryData[2] ? parseSpreadsheetNumber(summaryData[2][0]) : 0;
-
-    // Parse data pengeluaran terakhir
-    const pengeluaranKategori = data[1]?.values || [];
-    const pengeluaranJumlah = data[2]?.values || [];
-
-    // Parse data pendapatan terakhir
-    const pendapatanKategori = data[3]?.values || [];
-    const pendapatanJumlah = data[4]?.values || [];
-
-    const currentDate = new Date();
-    const bulan = currentDate.toLocaleString('id-ID', { month: 'long' }).toUpperCase();
-
-    // Format pesan rekap
-    let rekapMessage = `
-📊 *REKAP KEUANGAN BULAN ${bulan}* 📊
-
-💰 *Ringkasan:*
-💵 Total Pemasukan: ${formatCurrency(totalPemasukan)}
-💸 Total Pengeluaran: ${formatCurrency(totalPengeluaran)}
-💳 Saldo Akhir: ${formatCurrency(saldoAkhir)}
-
-`;
-
-    // Rincian Pengeluaran
-    if (pengeluaranKategori.length > 0) {
-      rekapMessage += `🔴 *Rincian Pengeluaran Terakhir:*\n`;
-      for (let i = 0; i < Math.min(pengeluaranKategori.length, 5); i++) {
-        const kategori = pengeluaranKategori[i]?.[0] || '';
-        const jumlah = pengeluaranJumlah[i] ? parseSpreadsheetNumber(pengeluaranJumlah[i][0]) : 0;
-        if (kategori && jumlah > 0) {
-          rekapMessage += `${i + 1}. ${kategori}: ${formatCurrency(jumlah)}\n`;
-        }
-      }
-      rekapMessage += '\n';
-    }
-
-    // Rincian Pendapatan
-    if (pendapatanKategori.length > 0) {
-      rekapMessage += `🟢 *Rincian Pendapatan Terakhir:*\n`;
-      for (let i = 0; i < Math.min(pendapatanKategori.length, 5); i++) {
-        const kategori = pendapatanKategori[i]?.[0] || '';
-        const jumlah = pendapatanJumlah[i] ? parseSpreadsheetNumber(pendapatanJumlah[i][0]) : 0;
-        if (kategori && jumlah > 0) {
-          rekapMessage += `${i + 1}. ${kategori}: ${formatCurrency(jumlah)}\n`;
-        }
-      }
-    }
-
-    // Tambahkan link spreadsheet
-    rekapMessage += `\n🔗 [Lihat Detail Spreadsheet](${userData.spreadsheet_link})`;
-
-    await ctx.replyWithMarkdown(rekapMessage);
-
-  } catch (error) {
-    console.error('Error in Rekap handler:', error);
-    ctx.reply('❌ Terjadi kesalahan saat mengambil rekap. Silakan coba lagi.');
-  }
-});
-
-bot.hears("Tentang", (ctx) => {
-  const tentangMessage = `
-*Tentang Bot Pencatatan Keuangan*
-
-Bot ini membantu Anda mencatat *pengeluaran* dan *pemasukan* harian secara otomatis menggunakan Google Spreadsheet.
-
-🧰 *Fitur Utama:*
-• Tambah catatan keuangan via chat
-• Tambah catatan keuangan via foto struk
-• Rekap pengeluaran dan pemasukan bulanan  
-• Dukungan multi-user (tiap user punya spreadsheet sendiri)  
-• AI chat Keuangan  
-
-📊 Data Anda disimpan aman di Google Spreadsheet pribadi Anda. 
-  `;
-
-  ctx.reply(tentangMessage, { parse_mode: 'Markdown' });
-});
-
-bot.hears("Bantuan", (ctx) => {
-  const bantuanMessage = `
-*Bantuan*
-
-Bot ini membantu Anda mencatat *pengeluaran* dan *pemasukan* harian secara otomatis menggunakan Google Spreadsheet.
-
-🧰 *Cara Penggunaan:*
-• Share link folder Google Drive Anda  
-• Mulai mencatat Pengeluaran dengan awalan /keluar. Contoh:
-
-\`/keluar makan nasi padang 25rb\`  
-atau  
-\`/keluar belanja bulanan 250 ribu\`
-
-• Untuk mencatat Pemasukan/pendapatan dengan awalan /masuk. Contoh:
-
-\`/masuk gaji bulanan 5jt\`  
-atau  
-\`/masuk freelance desain grafis 500rb\`
-
-• Untuk mencatat pengeluaran dengan foto struk, kirimkan foto struk Anda dan bot akan otomatis menganalisisnya  
-• Lihat Rekap bulanan Anda dengan perintah /rekap atau tombol *Rekap* di bawah  
-• Gunakan awalan /ai untuk memulai berinteraksi dengan AI seputar keuangan
-
-📷 Panduan: https://i.ibb.co/RkYbg2Z2/panduan.png
-
-📊 Data Anda disimpan aman di Google Spreadsheet pribadi Anda.
-
-Jika ada kendala hubungi [@catatanuangku_helper](https://t.me/catatanuangku_helper)
-  `;
-
-  ctx.reply(bantuanMessage, { parse_mode: 'Markdown' });
-});
-
-
-bot.hears("Kontak", (ctx) => {
-  const kontakMessage = `
-📞 *Kontak:*
- 
-💬 Helper Group: @catatanuangku_helper
-📧 Email: miftahelfalh@gmail.com
-
-
-Bot lainnya: @ArahKiblat_bot 
-  `;
-
-  ctx.reply(kontakMessage, { parse_mode: 'Markdown' });
-});
-
 
 // Handler untuk perintah /keluar (pengeluaran)
 bot.command('keluar', async (ctx) => {
@@ -806,109 +572,6 @@ bot.command('masuk', async (ctx) => {
   } catch (error) {
     console.error('Error in /masuk handler:', error);
     ctx.reply('❌ Terjadi kesalahan saat mencatat pendapatan. Silakan coba lagi.');
-  }
-});
-
-// Handler untuk perintah /rekap (rekap bulanan)
-bot.command('rekap', async (ctx) => {
-  const chatId = ctx.chat.id;
-
-  try {
-    // Cek apakah user sudah terdaftar
-    const userCheck = await checkUserExists(chatId);
-    if (!userCheck.success || !userCheck.exists) {
-      return ctx.reply('❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
-    }
-
-    const userData = userCheck.data;
-    const spreadsheetId = extractSpreadsheetIdFromUrl(userData.spreadsheet_link);
-
-    if (!spreadsheetId) {
-      return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
-    }
-
-    ctx.reply('⏳ Sedang mengambil data rekap...');
-
-    // Ranges yang akan dibaca
-    const ranges = [
-      'Dashboard!B2:B5',      // Total Pemasukan, Pengeluaran, Saldo
-      'Dashboard!N4:N8',      // Kategori pengeluaran terakhir
-      'Dashboard!O4:O8',      // Jumlah pengeluaran terakhir
-      'Dashboard!Q4:Q8',      // Kategori pendapatan terakhir
-      'Dashboard!R4:R8'       // Jumlah pendapatan terakhir
-    ];
-
-    const readResult = await readFromSpreadsheet(spreadsheetId, ranges);
-    if (!readResult.success) {
-      console.error('Read from spreadsheet failed:', readResult.error);
-      return ctx.reply('❌ Gagal mengambil data rekap. Pastikan spreadsheet dapat diakses.');
-    }
-
-    const data = readResult.data.valueRanges;
-
-    // Parse data ringkasan (B2:B5)
-    const summaryData = data[0]?.values || [];
-    const totalPengeluaran = summaryData[0] ? parseSpreadsheetNumber(summaryData[0][0]) : 0;
-    const totalPemasukan = summaryData[1] ? parseSpreadsheetNumber(summaryData[1][0]) : 0;
-    const saldoAkhir = summaryData[2] ? parseSpreadsheetNumber(summaryData[2][0]) : 0;
-
-    // Parse data pengeluaran terakhir
-    const pengeluaranKategori = data[1]?.values || [];
-    const pengeluaranJumlah = data[2]?.values || [];
-
-    // Parse data pendapatan terakhir
-    const pendapatanKategori = data[3]?.values || [];
-    const pendapatanJumlah = data[4]?.values || [];
-
-    const currentDate = new Date();
-    const bulan = currentDate.toLocaleString('id-ID', { month: 'long' }).toUpperCase();
-
-    // Format pesan rekap
-    let rekapMessage = `
-📊 *REKAP KEUANGAN BULAN ${bulan}* 📊
-
-💰 *Ringkasan:*
-💵 Total Pemasukan: ${formatCurrency(totalPemasukan)}
-💸 Total Pengeluaran: ${formatCurrency(totalPengeluaran)}
-💳 Saldo Akhir: ${formatCurrency(saldoAkhir)}
-
-`;
-
-    // Tambahkan rincian pengeluaran terakhir
-    if (pengeluaranKategori.length > 0) {
-      rekapMessage += `🔴 *Rincian Pengeluaran Terakhir:*\n`;
-      for (let i = 0; i < Math.min(pengeluaranKategori.length, 5); i++) {
-        const kategori = pengeluaranKategori[i] ? pengeluaranKategori[i][0] : '';
-        const jumlah = pengeluaranJumlah[i] ? parseSpreadsheetNumber(pengeluaranJumlah[i][0]) : 0;
-        
-        if (kategori && jumlah > 0) {
-          rekapMessage += `${i + 1}. ${kategori}: ${formatCurrency(jumlah)}\n`;
-        }
-      }
-      rekapMessage += '\n';
-    }
-
-    // Tambahkan rincian pendapatan terakhir
-    if (pendapatanKategori.length > 0) {
-      rekapMessage += `🟢 *Rincian Pendapatan Terakhir:*\n`;
-      for (let i = 0; i < Math.min(pendapatanKategori.length, 5); i++) {
-        const kategori = pendapatanKategori[i] ? pendapatanKategori[i][0] : '';
-        const jumlah = pendapatanJumlah[i] ? parseSpreadsheetNumber(pendapatanJumlah[i][0]) : 0;
-        
-        if (kategori && jumlah > 0) {
-          rekapMessage += `${i + 1}. ${kategori}: ${formatCurrency(jumlah)}\n`;
-        }
-      }
-    }
-
-    // Tambahkan link spreadsheet
-    rekapMessage += `\n🔗 [Lihat Detail Spreadsheet](${userData.spreadsheet_link})`;
-
-    await ctx.replyWithMarkdown(rekapMessage);
-
-  } catch (error) {
-    console.error('Error in /rekap handler:', error);
-    ctx.reply('❌ Terjadi kesalahan saat mengambil rekap. Silakan coba lagi.');
   }
 });
 
@@ -1099,18 +762,18 @@ bot.catch((err, ctx) => {
 });
 
 // Handler untuk Vercel
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   try {
     if (req.method === 'POST') {
       // Handle webhook dari Telegram
       await bot.handleUpdate(req.body);
       res.status(200).json({ ok: true });
     } else {
+      // Handle GET request (untuk testing)
       res.status(200).json({ message: 'Bot is running!' });
     }
   } catch (error) {
     console.error('Handler error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-};
-
+}
