@@ -690,19 +690,16 @@ Bot lainnya: @ArahKiblat_bot
 });
 
 bot.hears("Support", (ctx) => {
-  const photoUrl = "https://i.ibb.co/nxDfXfK/saweria.jpg";
-  const caption = `
+  const supportMessage = `
 *Bantu support Saweria* untuk biaya server lewat QR code di atas  
 atau link: [https://saweria.co/miftakhulfalh](https://saweria.co/miftakhulfalh)
 
 Terima kasih telah menggunakan bot ini 🙏🙏🙏
   `;
 
-  ctx.replyWithPhoto({ url: photoUrl }, {
-    caption,
-    parse_mode: 'Markdown'
-  });
+  ctx.reply(supportMessage, { parse_mode: 'Markdown' });
 });
+
 
 
 
