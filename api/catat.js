@@ -518,7 +518,7 @@ bot.hears("Buka Spreadsheet", async (ctx) => {
   }
 
   const message = `
-🔗 Berikut link spreadsheet Anda:<br>
+🔗 Berikut link spreadsheet Anda:
 <a href="${spreadsheetLink}">${spreadsheetLink}</a>
   `;
 
