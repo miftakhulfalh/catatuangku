@@ -478,6 +478,7 @@ Bot ini akan membantu Anda mengelola catatan keuangan pribadi menggunakan Google
 2. Bagikan/share folder tersebut ke email \`uangku@financial-report-bot.iam.gserviceaccount.com\` share sebagai "Editor"
 3. Copy link folder kamu
 4. Paste atau kirim link folder kamu.
+5. hiyaaaa
 
 🔗[Cara share folder Google Drive](https://i.ibb.co/XxtL7d4m/cara-share-folder.png)
 
