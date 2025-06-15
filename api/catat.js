@@ -502,6 +502,28 @@ Silakan kirimkan link folder Google Drive Anda untuk memulai! 📁
   });
 });
 
+bot.hears("Buka Spreadsheet", async (ctx) => {
+  const chatId = ctx.chat.id;
+
+  // Cek apakah user sudah terdaftar
+  const userCheck = await checkUserExists(chatId);
+  if (!userCheck.success || !userCheck.exists) {
+    return ctx.reply('❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
+  }
+
+  const spreadsheetLink = userCheck.data.spreadsheet_link;
+
+  if (!spreadsheetLink) {
+    return ctx.reply('❌ Link spreadsheet belum tersedia. Silakan setup ulang dengan mengirimkan link folder.');
+  }
+
+  const message = `
+🔗 Berikut link spreadsheet Anda:<br>
+<a href="${spreadsheetLink}">${spreadsheetLink}</a>
+  `;
+
+  return ctx.reply(message, { parse_mode: 'HTML' });
+});
 
 // Handler untuk perintah /keluar (pengeluaran)
 bot.command('keluar', async (ctx) => {
