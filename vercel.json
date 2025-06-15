@@ -3,7 +3,7 @@
   "builds": [
     {
       "src": "api/*.js",
-      "use": "@vercel/esm"
+      "use": "@vercel/node"
     }
   ],
   "routes": [
