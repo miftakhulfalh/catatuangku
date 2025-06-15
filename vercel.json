@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "functions": {
+    "api/catat.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/catat",
+      "dest": "/api/catat.js"
+    }
+  ]
+}
