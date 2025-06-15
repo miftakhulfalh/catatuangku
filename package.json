@@ -2,7 +2,6 @@
   "name": "finance-bot",
   "version": "1.0.0",
   "description": "Bot Telegram untuk Catatan Keuangan Pribadi",
-  "type": "module",
   "scripts": {
     "start": "node api/catat.js",
     "dev": "NODE_ENV=development node api/catat.js"
