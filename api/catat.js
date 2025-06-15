@@ -2,6 +2,7 @@
 import { Telegraf, Markup } from 'telegraf';
 import { createClient } from '@supabase/supabase-js';
 import { google } from 'googleapis';
+import Groq from 'groq-sdk';
 
 // Inisialisasi bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -11,6 +12,11 @@ const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
+
+// Inisialisasi Groq AI
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY
+});
 
 // Inisialisasi Google APIs
 const auth = new google.auth.GoogleAuth({
@@ -39,6 +45,18 @@ function extractFolderIdFromUrl(url) {
     return match ? match[1] : null;
   } catch (error) {
     console.error('Error extracting folder ID:', error);
+    return null;
+  }
+}
+
+// Fungsi untuk extract spreadsheet ID dari URL
+function extractSpreadsheetIdFromUrl(url) {
+  try {
+    const regex = /\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
+    const match = url.match(regex);
+    return match ? match[1] : null;
+  } catch (error) {
+    console.error('Error extracting spreadsheet ID:', error);
     return null;
   }
 }
@@ -179,6 +197,119 @@ async function deletePendingUpdate(chatId) {
   }
 }
 
+// Fungsi untuk mengklasifikasikan transaksi dengan AI Groq
+async function classifyTransaction(message, type) {
+  try {
+    const currentDate = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+    
+    const prompt = `
+Analisis pesan transaksi berikut dan berikan output dalam format JSON yang tepat:
+
+Pesan: "${message}"
+Tipe: "${type === 'keluar' ? 'Pengeluaran' : 'Pendapatan'}"
+
+Instruksi:
+1. Ekstrak jumlah uang dari pesan (hapus kata seperti "rb", "ribu", "juta", dll dan konversi ke angka)
+2. Tentukan kategori yang sesuai
+3. Ekstrak keterangan/deskripsi
+4. Jika tidak ada tanggal dalam pesan, gunakan tanggal hari ini: ${currentDate}
+
+Kategori untuk Pengeluaran:
+- Makanan & Minuman
+- Transportasi
+- Kendaraan
+- Belanja
+- Hiburan
+- Kesehatan
+- Pendidikan
+- Tagihan & Utilitas
+- Pengeluaran Lainnya
+
+Kategori untuk Pendapatan:
+- Gaji
+- Bonus
+- Freelance
+- Investasi
+- Bisnis
+- Pendapatan Lainnya
+
+Format output JSON:
+{
+  "klasifikasi": "${type === 'keluar' ? 'Pengeluaran' : 'Pendapatan'}",
+  "kategori": "kategori_yang_sesuai",
+  "jumlah": jumlah_dalam_angka,
+  "keterangan": "deskripsi_singkat",
+  "tanggal": "YYYY-MM-DD"
+}
+
+Berikan HANYA output JSON, tanpa teks tambahan apapun.
+    `;
+
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      model: "llama3-8b-8192",
+      temperature: 0.1,
+      max_tokens: 500,
+    });
+
+    const response = completion.choices[0]?.message?.content?.trim();
+    console.log('Groq AI Response:', response);
+
+    // Parse JSON response
+    const parsed = JSON.parse(response);
+    return { success: true, data: parsed };
+
+  } catch (error) {
+    console.error('Error in AI classification:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Fungsi untuk menulis ke spreadsheet
+async function writeToSpreadsheet(spreadsheetId, sheetName, data) {
+  try {
+    // Data yang akan ditulis ke spreadsheet
+    const values = [[
+      data.tanggal,
+      data.kategori,
+      data.jumlah,
+      data.keterangan
+    ]];
+
+    const resource = {
+      values: values
+    };
+
+    const result = await sheets.spreadsheets.values.append({
+      spreadsheetId: spreadsheetId,
+      range: `${sheetName}!A:D`, // Assuming columns A-D (Tanggal, Kategori, Jumlah, Keterangan)
+      valueInputOption: 'RAW',
+      resource: resource
+    });
+
+    console.log('Data written to spreadsheet:', result.data);
+    return { success: true, data: result.data };
+
+  } catch (error) {
+    console.error('Error writing to spreadsheet:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Fungsi untuk memformat currency
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0
+  }).format(amount);
+}
+
 // Handler untuk perintah /start
 bot.start((ctx) => {
   const welcomeMessage = `
@@ -200,6 +331,124 @@ Silakan kirimkan link folder Google Drive Anda untuk memulai! 📁
   `;
 
   ctx.replyWithMarkdown(welcomeMessage);
+});
+
+// Handler untuk perintah /keluar (pengeluaran)
+bot.command('keluar', async (ctx) => {
+  const chatId = ctx.chat.id;
+  const message = ctx.message.text.replace('/keluar', '').trim();
+
+  if (!message) {
+    return ctx.reply('❌ Mohon sertakan detail pengeluaran. Contoh: /keluar makan sate 20rb');
+  }
+
+  try {
+    // Cek apakah user sudah terdaftar
+    const userCheck = await checkUserExists(chatId);
+    if (!userCheck.success || !userCheck.exists) {
+      return ctx.reply('❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
+    }
+
+    const userData = userCheck.data;
+    const spreadsheetId = extractSpreadsheetIdFromUrl(userData.spreadsheet_link);
+
+    if (!spreadsheetId) {
+      return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
+    }
+
+    ctx.reply('⏳ Sedang memproses pengeluaran...');
+
+    // Klasifikasi dengan AI
+    const classification = await classifyTransaction(message, 'keluar');
+    if (!classification.success) {
+      console.error('Classification failed:', classification.error);
+      return ctx.reply('❌ Gagal menganalisis transaksi. Silakan coba lagi.');
+    }
+
+    const transactionData = classification.data;
+
+    // Tulis ke spreadsheet
+    const writeResult = await writeToSpreadsheet(spreadsheetId, 'Pengeluaran', transactionData);
+    if (!writeResult.success) {
+      console.error('Write to spreadsheet failed:', writeResult.error);
+      return ctx.reply('❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.');
+    }
+
+    // Kirim konfirmasi ke user
+    const confirmationMessage = `
+✅ *Berhasil mencatat Pengeluaran:*
+
+📅 *Tanggal:* ${transactionData.tanggal}
+🏷️ *Kategori:* ${transactionData.kategori}
+💰 *Jumlah:* ${formatCurrency(transactionData.jumlah)}
+📝 *Keterangan:* ${transactionData.keterangan}
+    `;
+
+    ctx.replyWithMarkdown(confirmationMessage);
+
+  } catch (error) {
+    console.error('Error in /keluar handler:', error);
+    ctx.reply('❌ Terjadi kesalahan saat mencatat pengeluaran. Silakan coba lagi.');
+  }
+});
+
+// Handler untuk perintah /masuk (pendapatan)
+bot.command('masuk', async (ctx) => {
+  const chatId = ctx.chat.id;
+  const message = ctx.message.text.replace('/masuk', '').trim();
+
+  if (!message) {
+    return ctx.reply('❌ Mohon sertakan detail pendapatan. Contoh: /masuk gaji bulanan 5juta');
+  }
+
+  try {
+    // Cek apakah user sudah terdaftar
+    const userCheck = await checkUserExists(chatId);
+    if (!userCheck.success || !userCheck.exists) {
+      return ctx.reply('❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
+    }
+
+    const userData = userCheck.data;
+    const spreadsheetId = extractSpreadsheetIdFromUrl(userData.spreadsheet_link);
+
+    if (!spreadsheetId) {
+      return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
+    }
+
+    ctx.reply('⏳ Sedang memproses pendapatan...');
+
+    // Klasifikasi dengan AI
+    const classification = await classifyTransaction(message, 'masuk');
+    if (!classification.success) {
+      console.error('Classification failed:', classification.error);
+      return ctx.reply('❌ Gagal menganalisis transaksi. Silakan coba lagi.');
+    }
+
+    const transactionData = classification.data;
+
+    // Tulis ke spreadsheet
+    const writeResult = await writeToSpreadsheet(spreadsheetId, 'Pendapatan', transactionData);
+    if (!writeResult.success) {
+      console.error('Write to spreadsheet failed:', writeResult.error);
+      return ctx.reply('❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.');
+    }
+
+    // Kirim konfirmasi ke user
+    const confirmationMessage = `
+✅ *Berhasil mencatat Pendapatan:*
+
+📅 *Tanggal:* ${transactionData.tanggal}
+🏷️ *Kategori:* ${transactionData.kategori}
+💰 *Jumlah:* ${formatCurrency(transactionData.jumlah)}
+📝 *Keterangan:* ${transactionData.keterangan}
+    `;
+
+    ctx.replyWithMarkdown(confirmationMessage);
+
+  } catch (error) {
+    console.error('Error in /masuk handler:', error);
+    ctx.reply('❌ Terjadi kesalahan saat mencatat pendapatan. Silakan coba lagi.');
+  }
 });
 
 // Handler untuk pesan teks (link folder)
