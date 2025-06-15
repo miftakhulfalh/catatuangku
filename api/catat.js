@@ -525,6 +525,93 @@ bot.hears("Buka Spreadsheet", async (ctx) => {
   return ctx.reply(message, { parse_mode: 'HTML' });
 });
 
+bot.hears("Rekap", async (ctx) => {
+  const chatId = ctx.chat.id;
+
+  try {
+    const userCheck = await checkUserExists(chatId);
+    if (!userCheck.success || !userCheck.exists) {
+      return ctx.reply('❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
+    }
+
+    const userData = userCheck.data;
+    const spreadsheetId = extractSpreadsheetIdFromUrl(userData.spreadsheet_link);
+
+    if (!spreadsheetId) {
+      return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
+    }
+
+    await ctx.reply('⏳ Sedang mengambil data rekap...');
+
+    const ranges = [
+      'Dashboard!B2:B5',
+      'Dashboard!N4:N8',
+      'Dashboard!O4:O8',
+      'Dashboard!Q4:Q8',
+      'Dashboard!R4:R8'
+    ];
+
+    const readResult = await readFromSpreadsheet(spreadsheetId, ranges);
+    if (!readResult.success) {
+      console.error('Read from spreadsheet failed:', readResult.error);
+      return ctx.reply('❌ Gagal mengambil data rekap. Pastikan spreadsheet dapat diakses.');
+    }
+
+    const data = readResult.data.valueRanges;
+    const summaryData = data[0]?.values || [];
+    const totalPengeluaran = summaryData[0] ? parseSpreadsheetNumber(summaryData[0][0]) : 0;
+    const totalPemasukan = summaryData[1] ? parseSpreadsheetNumber(summaryData[1][0]) : 0;
+    const saldoAkhir = summaryData[2] ? parseSpreadsheetNumber(summaryData[2][0]) : 0;
+
+    const pengeluaranKategori = data[1]?.values || [];
+    const pengeluaranJumlah = data[2]?.values || [];
+    const pendapatanKategori = data[3]?.values || [];
+    const pendapatanJumlah = data[4]?.values || [];
+
+    const currentDate = new Date();
+    const bulan = currentDate.toLocaleString('id-ID', { month: 'long' }).toUpperCase();
+
+    let rekapMessage = `
+📊 <b>REKAP KEUANGAN BULAN ${bulan}</b>
+
+💰 <b>Ringkasan:</b>
+💵 Total Pemasukan: ${formatCurrency(totalPemasukan)}
+💸 Total Pengeluaran: ${formatCurrency(totalPengeluaran)}
+💳 Saldo Akhir: ${formatCurrency(saldoAkhir)}
+`;
+
+    if (pengeluaranKategori.length > 0) {
+      rekapMessage += `\n🔴 <b>Rincian Pengeluaran Terakhir:</b>`;
+      for (let i = 0; i < Math.min(pengeluaranKategori.length, 5); i++) {
+        const kategori = pengeluaranKategori[i]?.[0] || '';
+        const jumlah = pengeluaranJumlah[i] ? parseSpreadsheetNumber(pengeluaranJumlah[i][0]) : 0;
+        if (kategori && jumlah > 0) {
+          rekapMessage += `\n${i + 1}. ${kategori}: ${formatCurrency(jumlah)}`;
+        }
+      }
+    }
+
+    if (pendapatanKategori.length > 0) {
+      rekapMessage += `\n\n🟢 <b>Rincian Pendapatan Terakhir:</b>`;
+      for (let i = 0; i < Math.min(pendapatanKategori.length, 5); i++) {
+        const kategori = pendapatanKategori[i]?.[0] || '';
+        const jumlah = pendapatanJumlah[i] ? parseSpreadsheetNumber(pendapatanJumlah[i][0]) : 0;
+        if (kategori && jumlah > 0) {
+          rekapMessage += `\n${i + 1}. ${kategori}: ${formatCurrency(jumlah)}`;
+        }
+      }
+    }
+
+    rekapMessage += `\n\n🔗 <a href="${userData.spreadsheet_link}">Lihat Detail Spreadsheet</a>`;
+
+    await ctx.reply(rekapMessage, { parse_mode: 'HTML' });
+
+  } catch (error) {
+    console.error('Error in Rekap handler:', error);
+    ctx.reply('❌ Terjadi kesalahan saat mengambil rekap. Silakan coba lagi.');
+  }
+});
+
 // Handler untuk perintah /keluar (pengeluaran)
 bot.command('keluar', async (ctx) => {
   const chatId = ctx.chat.id;
