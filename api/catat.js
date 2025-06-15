@@ -469,29 +469,39 @@ function formatCurrency(amount) {
 // Handler untuk perintah /start
 bot.start((ctx) => {
   const welcomeMessage = `
-🎉 *Selamat datang di Bot Catatan Keuangan Pribadi!* 🎉
+🎉 <b>Selamat datang di Bot Catatan Keuangan Pribadi!</b> 🎉
 
 Bot ini akan membantu Anda mengelola catatan keuangan pribadi menggunakan Google Spreadsheet.
 
-📋 *Cara penggunaan:*
-1. Buat folder baru di Google Drive kamu
-2. Bagikan/share folder tersebut ke email \`uangku@financial-report-bot.iam.gserviceaccount.com\` share sebagai "Editor"
-3. Copy link folder kamu
-4. Paste atau kirim link folder kamu.
-5. hiyaaaa
+📋 <b>Cara penggunaan:</b>
+1. Buat folder baru di Google Drive kamu  
+2. Bagikan/share folder tersebut ke email <code>uangku@financial-report-bot.iam.gserviceaccount.com</code> sebagai "Editor"  
+3. Copy link folder kamu  
+4. Paste atau kirim link folder kamu
 
-🔗[Cara share folder Google Drive](https://i.ibb.co/XxtL7d4m/cara-share-folder.png)
+🔗 <a href="https://i.ibb.co/XxtL7d4m/cara-share-folder.png">Cara share folder Google Drive</a>
 
-⚠️ *Pastikan:*
-- Link yang dikirim adalah link folder Google Drive (bukan file)
-- Folder Google Drive dapat diakses oleh bot
-- Anda memiliki izin edit pada folder tersebut
+⚠️ <b>Pastikan:</b>
+- Link yang dikirim adalah link folder Google Drive (bukan file)  
+- Folder dapat diakses oleh bot  
+- Anda memiliki izin edit
 
 Silakan kirimkan link folder Google Drive Anda untuk memulai! 📁
   `;
 
-  ctx.replyWithMarkdown(welcomeMessage);
+  ctx.reply(welcomeMessage, {
+    parse_mode: 'HTML',
+    reply_markup: {
+      keyboard: [
+        ['Buka Spreadsheet', 'Rekap', 'Bantuan'],
+        ['Tentang', 'Kontak', 'Support']
+      ],
+      resize_keyboard: true,
+      one_time_keyboard: false
+    }
+  });
 });
+
 
 // Handler untuk perintah /keluar (pengeluaran)
 bot.command('keluar', async (ctx) => {
