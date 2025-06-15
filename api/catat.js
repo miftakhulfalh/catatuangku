@@ -1,8 +1,8 @@
 // api/catat.js
-const { Telegraf, Markup } = require('telegraf');
-const { createClient } = require('@supabase/supabase-js');
-const { google } = require('googleapis');
-const Groq = require('groq-sdk');
+import { Telegraf, Markup } from 'telegraf';
+import { createClient } from '@supabase/supabase-js';
+import { google } from 'googleapis';
+import Groq from 'groq-sdk';
 
 // Inisialisasi bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -474,13 +474,9 @@ bot.start((ctx) => {
 Bot ini akan membantu Anda mengelola catatan keuangan pribadi menggunakan Google Spreadsheet.
 
 📋 *Cara penggunaan:*
-1. Buat folder baru di Google Drive kamu
-2. Bagikan/share folder tersebut ke email \`uangku@financial-report-bot.iam.gserviceaccount.com\` share sebagai "Editor"
-3. Copy link folder kamu
-4. Paste atau kirim link folder kamu.
-
-🔗[Cara share folder Google Drive](https://i.ibb.co/XxtL7d4m/cara-share-folder.png)
-
+1. Kirimkan link folder Google Drive Anda
+2. Bot akan membuat file spreadsheet catatan keuangan di folder tersebut
+3. Anda bisa mulai mencatat keuangan menggunakan spreadsheet yang telah dibuat
 
 ⚠️ *Pastikan:*
 - Link yang dikirim adalah link folder Google Drive (bukan file)
@@ -490,18 +486,8 @@ Bot ini akan membantu Anda mengelola catatan keuangan pribadi menggunakan Google
 Silakan kirimkan link folder Google Drive Anda untuk memulai! 📁
   `;
 
-  ctx.reply(welcomeMessage, {
-    parse_mode: 'Markdown',
-    reply_markup: {
-      keyboard: [
-        ['Buka Spreadsheet', 'Rekap', 'Bantuan'],
-        ['Tentang', 'Kontak', 'Support']
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: false
-    }
-  });
-
+  ctx.replyWithMarkdown(welcomeMessage);
+});
 
 // Handler untuk perintah /keluar (pengeluaran)
 bot.command('keluar', async (ctx) => {
@@ -910,26 +896,19 @@ bot.catch((err, ctx) => {
   ctx.reply('❌ Terjadi kesalahan pada bot. Silakan coba lagi.');
 });
 
-bot.launch();
-
 // Handler untuk Vercel
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   try {
     if (req.method === 'POST') {
+      // Handle webhook dari Telegram
       await bot.handleUpdate(req.body);
-      return res.status(200).json({ ok: true });
-    } 
-    return res.status(200).json({ 
-      status: 'active',
-      message: 'Bot API is running',
-      timestamp: new Date().toISOString()
-    });
+      res.status(200).json({ ok: true });
+    } else {
+      // Handle GET request (untuk testing)
+      res.status(200).json({ message: 'Bot is running!' });
+    }
   } catch (error) {
-    console.error('Global handler error:', error);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      message: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    console.error('Handler error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-};
+}
