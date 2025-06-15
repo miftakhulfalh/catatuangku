@@ -474,9 +474,13 @@ bot.start((ctx) => {
 Bot ini akan membantu Anda mengelola catatan keuangan pribadi menggunakan Google Spreadsheet.
 
 📋 *Cara penggunaan:*
-1. Kirimkan link folder Google Drive Anda
-2. Bot akan membuat file spreadsheet catatan keuangan di folder tersebut
-3. Anda bisa mulai mencatat keuangan menggunakan spreadsheet yang telah dibuat
+1. Buat folder baru di Google Drive kamu
+2. Bagikan/share folder tersebut ke email \`uangku@financial-report-bot.iam.gserviceaccount.com\` share sebagai "Editor"
+3. Copy link folder kamu
+4. Paste atau kirim link folder kamu.
+
+🔗[Cara share folder Google Drive](https://i.ibb.co/XxtL7d4m/cara-share-folder.png)
+
 
 ⚠️ *Pastikan:*
 - Link yang dikirim adalah link folder Google Drive (bukan file)
