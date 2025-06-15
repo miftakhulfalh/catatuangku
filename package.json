@@ -2,10 +2,10 @@
   "name": "telegram-finance-bot",
   "version": "1.0.0",
   "description": "Bot Telegram untuk Catatan Keuangan Pribadi",
-  "main": "api/catat.js",
   "scripts": {
-    "start": "node api/catat.js",
-    "dev": "nodemon api/catat.js"
+    "dev": "vercel dev",
+    "build": "echo 'Build completed'",
+    "start": "vercel dev"
   },
   "dependencies": {
     "telegraf": "^4.15.6",
