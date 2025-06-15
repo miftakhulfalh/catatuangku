@@ -1104,23 +1104,23 @@ async function processNewFolder(ctx, folderId, firstName, folderLink, isUpdate =
     await delay(1000);
 
     const successMessage = `
-🎉 *${isUpdate ? 'Folder berhasil diperbarui!' : 'Setup berhasil!'}* 🎉
+🎉 <b>${isUpdate ? 'Folder berhasil diperbarui!' : 'Setup berhasil!'}</b> 🎉
 
 📊 Spreadsheet catatan keuangan Anda telah dibuat dengan nama:
-*${fileName}*
+<b>${fileName}</b>
 
-🔗 *Link Spreadsheet:*
+🔗 <b>Link Spreadsheet:</b>
 ${copyResult.url}
 
 ✅ Anda sekarang dapat mulai mencatat keuangan pribadi menggunakan spreadsheet tersebut.
 Gunakan menu Bantuan di bawah untuk mempelajari cara mencatat keuangan.
 
-💡 *Tips:* Bookmark link spreadsheet di atas untuk akses yang lebih mudah!
-    `;
+💡 <b>Tips:</b> Bookmark link spreadsheet di atas untuk akses yang lebih mudah!
+`;
 
-    console.log('📤 Sending success message...');
-    await ctx.replyWithMarkdown(successMessage);
-    console.log('✅ Success message sent');
+console.log('📤 Sending success message...');
+await ctx.reply(successMessage, { parse_mode: 'HTML' });
+console.log('✅ Success message sent');
 
   } catch (error) {
     console.error('Error in processNewFolder:', error);
