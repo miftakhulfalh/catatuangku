@@ -2,14 +2,17 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/catat.js",
+      "src": "api/*.js",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/catat",
+      "src": "/(.*)",
       "dest": "/api/catat.js"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
