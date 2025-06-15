@@ -1,0 +1,30 @@
+{
+  "name": "telegram-finance-bot",
+  "version": "1.0.0",
+  "description": "Bot Telegram untuk Catatan Keuangan Pribadi",
+  "main": "api/catat.js",
+  "scripts": {
+    "start": "node api/catat.js",
+    "dev": "nodemon api/catat.js"
+  },
+  "dependencies": {
+    "telegraf": "^4.15.6",
+    "@supabase/supabase-js": "^2.39.0",
+    "googleapis": "^131.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "finance",
+    "spreadsheet",
+    "google-drive"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
