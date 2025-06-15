@@ -1,10 +1,16 @@
 {
-  "rewrites": [
-    { "source": "/api/catat", "destination": "/api/catat.js" }
-  ],
-  "functions": {
-    "api/catat.js": {
-      "includeFiles": "**/*.json"
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/catat.js",
+      "use": "@vercel/node"
     }
-  }
+  ],
+  "routes": [
+    {
+      "src": "/api/catat",
+      "dest": "api/catat.js",
+      "methods": ["GET", "POST"]
+    }
+  ]
 }
