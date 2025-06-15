@@ -658,9 +658,12 @@ bot.command('rekap', async (ctx) => {
     const pendapatanKategori = data[3]?.values || [];
     const pendapatanJumlah = data[4]?.values || [];
 
+    const currentDate = new Date();
+    const bulan = currentDate.toLocaleString('id-ID', { month: 'long' }).toUpperCase();
+
     // Format pesan rekap
     let rekapMessage = `
-📊 *REKAP KEUANGAN BULANAN* 📊
+📊 *REKAP KEUANGAN BULAN ${bulan}* 📊
 
 💰 *Ringkasan:*
 💵 Total Pemasukan: ${formatCurrency(totalPemasukan)}
