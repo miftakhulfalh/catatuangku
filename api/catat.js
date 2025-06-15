@@ -489,17 +489,8 @@ Bot ini akan membantu Anda mengelola catatan keuangan pribadi menggunakan Google
 Silakan kirimkan link folder Google Drive Anda untuk memulai! 📁
   `;
 
-  ctx.reply(welcomeMessage, {
-    parse_mode: 'Markdown',
-    reply_markup: {
-      keyboard: [
-        ['Buka Spreadsheet', 'Rekap', 'Bantuan'],
-        ['Tentang', 'Kontak', 'Support']
-      ],
-      resize_keyboard: true,
-      one_time_keyboard: false
-    }
-  });
+  ctx.replyWithMarkdown(welcomeMessage);
+});
 
 // Handler untuk perintah /keluar (pengeluaran)
 bot.command('keluar', async (ctx) => {
