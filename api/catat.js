@@ -674,21 +674,16 @@ bot.hears("Kontak", (ctx) => {
 });
 
 bot.hears("Support", (ctx) => {
-  const photoUrl = 'https://i.ibb.co/nxDfXfK/saweria.jpg';
-  const caption = `
+  const message = `
 <b>Bantu Support</b>
 
-Dukung biaya server dan pengembangan bot ini melalui QR code di atas atau tautan berikut:
+Dukung biaya server dan pengembangan bot ini melalui Saweria:
 
-<a href="https://saweria.co/miftakhulfalh">https://saweria.co/miftakhulfalh</a>
+🔗 <a href="https://saweria.co/miftakhulfalh">https://saweria.co/miftakhulfalh</a>
 
 Terima kasih telah menggunakan bot ini 🙏🙏🙏
   `;
-
-  ctx.replyWithPhoto({ url: photoUrl }, {
-    caption,
-    parse_mode: 'HTML'
-  });
+  ctx.reply(message, { parse_mode: 'HTML' });
 });
 
 // Handler untuk perintah /keluar (pengeluaran)
