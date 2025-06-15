@@ -911,16 +911,28 @@ bot.catch((err, ctx) => {
 });
 
 // Handler untuk Vercel
-async function handler(req, res) {
+module.exports = async (req, res) => {
   try {
     if (req.method === 'POST') {
+      // Pastikan body berbentuk JSON
+      if (typeof req.body === 'string') {
+        req.body = JSON.parse(req.body);
+      }
+      
       await bot.handleUpdate(req.body);
-      res.status(200).json({ ok: true });
-    } else {
-      res.status(200).json({ message: 'Bot is running!' });
-    }
+      return res.status(200).json({ status: 'success' });
+    } 
+    
+    // GET request untuk verifikasi
+    return res.status(200).send(`
+      <h1>Catat Bot API</h1>
+      <p>Endpoint aktif. Gunakan POST request untuk webhook Telegram.</p>
+    `);
   } catch (error) {
     console.error('Handler error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
   }
-}
+};
