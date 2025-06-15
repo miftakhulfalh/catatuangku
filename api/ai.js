@@ -1,0 +1,57 @@
+// file: api/ai.js
+
+import Groq from 'groq-sdk';
+import { createClient } from '@supabase/supabase-js';
+
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).end();
+
+  const { userId, message } = req.body;
+
+  if (!userId || !message) {
+    return res.status(400).json({ error: 'userId dan message wajib.' });
+  }
+
+  try {
+    // Ambil riwayat chat user (max 10 terakhir)
+    const { data: history, error } = await supabase
+      .from('chat_memory')
+      .select('role, content')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(10);
+
+    if (error) throw error;
+
+    const messages = [
+      { role: 'system', content: 'You are a helpful assistant.' },
+      ...(history || []),
+      { role: 'user', content: message }
+    ];
+
+    const completion = await groq.chat.completions.create({
+      model: 'llama3-8b-8192',
+      messages
+    });
+
+    const reply = completion.choices?.[0]?.message?.content || '(tidak ada balasan)';
+
+    // Simpan ke memory
+    await supabase.from('chat_memory').insert([
+      { user_id: userId, role: 'user', content: message },
+      { user_id: userId, role: 'assistant', content: reply }
+    ]);
+
+    res.status(200).json({ reply });
+  } catch (err) {
+    console.error('AI error:', err);
+    res.status(500).json({ error: 'Gagal memproses permintaan AI.' });
+  }
+}
