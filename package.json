@@ -1,22 +1,11 @@
 {
-  "name": "telegram-finance-bot",
+  "name": "finance-bot",
   "version": "1.0.0",
   "description": "Bot Telegram untuk Catatan Keuangan Pribadi",
+  "type": "module",
   "scripts": {
-    "dev": "vercel dev",
-    "build": "echo 'Build completed'",
-    "start": "vercel dev"
-  },
-  "dependencies": {
-    "telegraf": "^4.15.6",
-    "@supabase/supabase-js": "^2.39.0",
-    "googleapis": "^131.0.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "start": "node api/catat.js",
+    "dev": "NODE_ENV=development node api/catat.js"
   },
   "keywords": [
     "telegram",
@@ -25,6 +14,16 @@
     "spreadsheet",
     "google-drive"
   ],
-  "author": "Your Name",
-  "license": "MIT"
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "telegraf": "^4.15.6",
+    "@supabase/supabase-js": "^2.39.0",
+    "googleapis": "^131.0.0",
+    "dotenv": "^16.3.1",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
