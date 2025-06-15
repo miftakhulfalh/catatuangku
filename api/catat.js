@@ -690,7 +690,7 @@ Bot lainnya: @ArahKiblat_bot
 });
 
 bot.hears("Support", (ctx) => {
-  const fileId = "AgACAgUAAxkBAAICvmg9Ozm5fPRiSqJOWU4VzFLEdWXCAAImxTEb6TvpVZOGU4qh9hJHAQADAgADeAADNgQ";
+  const photoUrl = "https://i.ibb.co/nxDfXfK/saweria.jpg";
   const caption = `
 *Bantu support Saweria* untuk biaya server lewat QR code di atas  
 atau link: [https://saweria.co/miftakhulfalh](https://saweria.co/miftakhulfalh)
@@ -698,11 +698,12 @@ atau link: [https://saweria.co/miftakhulfalh](https://saweria.co/miftakhulfalh)
 Terima kasih telah menggunakan bot ini 🙏🙏🙏
   `;
 
-  ctx.replyWithPhoto(fileId, {
-    caption: caption,
+  ctx.replyWithPhoto({ url: photoUrl }, {
+    caption,
     parse_mode: 'Markdown'
   });
 });
+
 
 
 // Handler untuk perintah /keluar (pengeluaran)
