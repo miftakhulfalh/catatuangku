@@ -225,8 +225,11 @@ Kategori untuk Pengeluaran:
 - Belanja
 - Hiburan
 - Kesehatan
+- PDAM
 - Pendidikan
-- Tagihan & Utilitas
+- Listrik
+- Tagihan
+- Utilitas
 - Pengeluaran Lainnya
 
 Kategori untuk Pendapatan:
