@@ -1072,7 +1072,7 @@ async function processNewFolder(ctx, folderId, firstName, folderLink, isUpdate =
     const folderAccess = await checkFolderAccess(folderId);
     if (!folderAccess.success) {
       console.error('Folder access failed:', folderAccess.error);
-      return ctx.reply('❌ Penyimpanan folder gagal. Pastikan folder sudah di share/bagikan ke email: uangku@financial-report-bot.iam.gserviceaccount.com dan memiliki izin sebagai "Editor".\n\n📌 Jika sudah merasa benar, coba kirim ulang link folder.');
+      return ctx.reply('❌ Penyimpanan folder gagal. Pastikan folder sudah di share/bagikan ke email: uangku@financial-report-bot.iam.gserviceaccount.com dan memiliki izin sebagai EDITOR.\n\n📌 Jika sudah merasa benar, coba kirim ulang link folder.');
     }
 
     ctx.reply('✅ Folder berhasil diakses. Sedang membuat spreadsheet...');
@@ -1083,7 +1083,7 @@ async function processNewFolder(ctx, folderId, firstName, folderLink, isUpdate =
     
     if (!copyResult.success) {
       console.error('Template copy failed:', copyResult.error);
-      return ctx.reply('❌ Gagal membuat spreadsheet catatan keuangan. Silakan coba lagi.');
+      return ctx.reply('❌ Gagal membuat spreadsheet catatan keuangan. Coba klik menu "Buka Spreadsheet" di bawah, jika spreadsheet berhasil dibuat silakan mulai mencatat. Atau cek manual di folder Drive Anda apakah spreadsheet template sudah dibuat. Jika belum ada spreadsheet,silakan coba lagi. Pastikan link folder Drive dibagikan ke email bot sebagai Editor bukan Viewer.');
     }
     console.log('✅ Template copied successfully');
     
