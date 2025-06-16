@@ -669,7 +669,7 @@ Bot ini membantu Anda mencatat <b>pengeluaran</b> dan <b>pemasukan</b> harian se
 
 bot.hears("Kontak", (ctx) => {
   const message = `
-<b>Kontak Pengembang</b>
+<b>Kontak</b>
 
 💬 Helper Group: @catatanuangku_helper
 📧 Email: Email: miftahelfalh@gmail.com
@@ -1147,7 +1147,7 @@ export default async function handler(req, res) {
       res.status(200).json({ ok: true });
     } else {
       // Handle GET request (untuk testing)
-      res.status(200).json({ message: 'Bot is running!' });
+      res.status(200).json({ message: 'Bot is running on t.me/catatanuangkubot' });
     }
   } catch (error) {
     console.error('Handler error:', error);
