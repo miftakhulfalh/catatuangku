@@ -5,6 +5,15 @@ import { google } from 'googleapis';
 import Groq from 'groq-sdk';
 import fetch from 'node-fetch';
 import FormData from 'form-data';
+import fs from 'fs';
+import path from 'path';
+import axios from 'axios';
+import { fileURLToPath } from 'url';
+import { tmpdir } from 'os';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Inisialisasi bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -227,12 +236,16 @@ async function processReceiptOCR(imageUrl) {
       throw new Error('OCR API key not configured');
     }
 
+    // Unduh file dari Telegram
+    const fileResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+    const tempPath = path.join(tmpdir(), `receipt-${Date.now()}.jpg`);
+    fs.writeFileSync(tempPath, fileResponse.data);
+
     const formData = new FormData();
-    formData.append('url', imageUrl);
+    formData.append('file', fs.createReadStream(tempPath));
     formData.append('apikey', ocrApiKey);
     formData.append('language', 'eng');
     formData.append('detectOrientation', 'true');
-    formData.append('scale', 'true');
     formData.append('OCREngine', '2');
 
     const response = await fetch('https://api.ocr.space/parse/image', {
@@ -241,6 +254,7 @@ async function processReceiptOCR(imageUrl) {
     });
 
     const result = await response.json();
+    fs.unlinkSync(tempPath); // Hapus file temp setelah selesai
     
     if (!result.IsErroredOnProcessing && result.ParsedResults && result.ParsedResults.length > 0) {
       const extractedText = result.ParsedResults[0].ParsedText;
