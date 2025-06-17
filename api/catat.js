@@ -8,7 +8,6 @@ import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
-import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 
