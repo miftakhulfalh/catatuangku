@@ -240,20 +240,28 @@ async function processReceiptOCR(imageUrl) {
     const tempPath = path.join(tmpdir(), `receipt-${Date.now()}.jpg`);
     fs.writeFileSync(tempPath, fileResponse.data);
 
-    const formData = new FormData();
-    formData.append('file', fs.createReadStream(tempPath));
-    formData.append('apikey', ocrApiKey);
-    formData.append('language', 'eng');
-    formData.append('detectOrientation', 'true');
-    formData.append('OCREngine', '2');
+    const formData = {
+      file: fs.createReadStream(tempPath),
+      apikey: ocrApiKey,
+      language: 'eng',
+      detectOrientation: 'true',
+      OCREngine: '2'
+    };
 
-    const response = await fetch('https://api.ocr.space/parse/image', {
-      method: 'POST',
-      body: formData
-    });
+    const response = await axios.post(
+      'https://api.ocr.space/parse/image', 
+      formData,
+      {
+        headers: {
+          ...formData.getHeaders?.(), // Tetap dukung jika formData punya getHeaders
+          'Content-Type': 'multipart/form-data'
+        }
+      }
+    );
 
-    const result = await response.json();
-    fs.unlinkSync(tempPath); // Hapus file temp setelah selesai
+    fs.unlinkSync(tempPath);
+    
+    const result = response.data;
     
     if (!result.IsErroredOnProcessing && result.ParsedResults && result.ParsedResults.length > 0) {
       const extractedText = result.ParsedResults[0].ParsedText;
