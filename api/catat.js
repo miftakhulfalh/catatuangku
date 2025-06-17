@@ -684,7 +684,7 @@ Bot ini membantu Anda mencatat <b>pengeluaran</b> dan <b>pemasukan</b> harian se
 • AI keuangan
 • Spreadsheet pribadi tiap pengguna
 
-👥 Saat ini sudah ada <b>${totalUsers}</b> orang yang terbantu mencatat keuangan mereka tanpa ribet lagi.
+✔ Saat ini sudah ada <b>${totalUsers.toLocaleString('id-ID')}</b> orang yang terbantu mencatat keuangan mereka tanpa ribet lagi.
 
 📊 Data Anda disimpan aman di Google Spreadsheet pribadi Anda.
   `;
@@ -697,7 +697,9 @@ bot.hears("Kontak", (ctx) => {
 <b>Kontak</b>
 
 💬 Helper Group: @catatanuangku_helper
-📧 Email: Email: miftahelfalh@gmail.com
+📧 Email: miftahelfalh@gmail.com
+
+Bot lainnya: @ArahKiblat_bot
   `;
   ctx.reply(message, { parse_mode: 'HTML' });
 });
