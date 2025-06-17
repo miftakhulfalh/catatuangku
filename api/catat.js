@@ -292,7 +292,7 @@ Instruksi:
 1. Tentukan apakah ini adalah struk belanja/invoice yang valid (jika tidak, set "valid_receipt": false)
 2. Tentukan apakah ini pengeluaran atau pendapatan berdasarkan konteks
 3. Ekstrak tanggal transaksi (jika ada), jika tidak ada gunakan tanggal hari ini: ${currentDate}
-4. Cari jumlah total atau grand total (prioritaskan "Total", "Grand Total", "Amount", "Subtotal")
+4. Cari jumlah total atau grand total (prioritaskan "Total", "Grand Total", "Amount", "Subtotal"). Jika nominal tidak ada tanda titik, asumsikan itu ribuan. Misalnya, "Rp 70000" berarti tujuh puluh ribu, bukan tujuh puluh.
 5. Tentukan kategori berdasarkan jenis toko/bisnis atau item yang dibeli
 6. Buat keterangan singkat berdasarkan nama toko atau jenis pembelian
 
