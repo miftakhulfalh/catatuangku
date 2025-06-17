@@ -198,6 +198,25 @@ async function deletePendingUpdate(chatId) {
   }
 }
 
+// Fungsi untuk menghitung total user
+async function getTotalUsers() {
+  try {
+    const { count, error } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true });
+
+    if (error) {
+      console.error('Error fetching total users:', error);
+      return 0;
+    }
+
+    return count || 0;
+  } catch (err) {
+    console.error('Unexpected error in getTotalUsers:', err);
+    return 0;
+  }
+}
+
 // Fungsi untuk mengklasifikasikan transaksi dengan AI Groq
 async function classifyTransaction(message, type) {
   try {
@@ -650,20 +669,26 @@ Jika ada kendala hubungi <a href="https://t.me/catatanuangku_helper">@catatanuan
   ctx.reply(bantuanMessage, { parse_mode: 'HTML' });
 });
 
-bot.hears("Tentang", (ctx) => {
+bot.hears("Tentang", async (ctx) => {
+  const totalUsers = await getTotalUsers();
+
   const message = `
 <b>Tentang Bot</b>
 
 Bot ini membantu Anda mencatat <b>pengeluaran</b> dan <b>pemasukan</b> harian secara otomatis menggunakan Google Spreadsheet.
- <b>Fitur Utama:</b>
+
+<b>Fitur Utama:</b>
 • Tambah catatan keuangan via chat
 • Tambah catatan keuangan via foto struk
-• Rekap pengeluaran dan pemasukan bulanan  
-• Dukungan multi-user (tiap user punya spreadsheet sendiri)  
-• AI chat Keuangan  
+• Rekap bulanan otomatis
+• AI keuangan
+• Spreadsheet pribadi tiap pengguna
+
+👥 Saat ini sudah ada <b>${totalUsers}</b> orang yang terbantu mencatat keuangan mereka tanpa ribet lagi.
 
 📊 Data Anda disimpan aman di Google Spreadsheet pribadi Anda.
   `;
+
   ctx.reply(message, { parse_mode: 'HTML' });
 });
 
