@@ -841,7 +841,7 @@ Bot ini membantu Anda mencatat <b>pengeluaran</b> dan <b>pemasukan</b> harian se
 • AI keuangan
 • Spreadsheet pribadi tiap pengguna
 
-🟡 Saat ini sudah ada <b>${totalUsers.toLocaleString('id-ID')}</b> orang yang terbantu mencatat keuangan mereka tanpa ribet lagi.
+🟡 Saat ini, lebih dari <b>${totalUsers.toLocaleString('id-ID')}</b> orang yang terbantu mencatat keuangan mereka tanpa ribet lagi.
 
 📊 Data Anda disimpan aman di Google Spreadsheet pribadi Anda.
   `;
