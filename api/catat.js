@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { google } from 'googleapis';
 import Groq from 'groq-sdk';
 import fetch from 'node-fetch';
+import FormData from 'form-data';
 
 // Inisialisasi bot
 const bot = new Telegraf(process.env.BOT_TOKEN);
@@ -214,6 +215,141 @@ async function getTotalUsers() {
   } catch (err) {
     console.error('Unexpected error in getTotalUsers:', err);
     return 0;
+  }
+}
+
+// Tambahkan fungsi OCR menggunakan OCR.space
+async function processReceiptOCR(imageUrl) {
+  try {
+    const ocrApiKey = process.env.OCR_SPACE_API_KEY;
+    
+    if (!ocrApiKey) {
+      throw new Error('OCR API key not configured');
+    }
+
+    const formData = new FormData();
+    formData.append('url', imageUrl);
+    formData.append('apikey', ocrApiKey);
+    formData.append('language', 'eng');
+    formData.append('detectOrientation', 'true');
+    formData.append('scale', 'true');
+    formData.append('OCREngine', '2');
+
+    const response = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      body: formData
+    });
+
+    const result = await response.json();
+    
+    if (!result.IsErroredOnProcessing && result.ParsedResults && result.ParsedResults.length > 0) {
+      const extractedText = result.ParsedResults[0].ParsedText;
+      console.log('OCR extracted text:', extractedText);
+      return { success: true, text: extractedText };
+    } else {
+      console.error('OCR processing failed:', result);
+      return { success: false, error: 'Failed to extract text from image' };
+    }
+
+  } catch (error) {
+    console.error('Error in OCR processing:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Fungsi untuk menganalisis teks struk dengan AI
+async function analyzeReceiptText(ocrText) {
+  try {
+    const currentDate = new Date().toISOString().split('T')[0];
+    
+    const prompt = `
+Analisis teks struk/invoice berikut dan ekstrak informasi keuangan dalam format JSON:
+
+Teks OCR: "${ocrText}"
+
+Instruksi:
+1. Tentukan apakah ini adalah struk belanja/invoice yang valid (jika tidak, set "valid_receipt": false)
+2. Tentukan apakah ini pengeluaran atau pendapatan berdasarkan konteks
+3. Ekstrak tanggal transaksi (jika ada), jika tidak ada gunakan tanggal hari ini: ${currentDate}
+4. Cari jumlah total atau grand total (prioritaskan "Total", "Grand Total", "Amount", "Subtotal")
+5. Tentukan kategori berdasarkan jenis toko/bisnis atau item yang dibeli
+6. Buat keterangan singkat berdasarkan nama toko atau jenis pembelian
+
+Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Kesehatan, PDAM, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
+
+Kategori Pendapatan: Gaji, Bonus, Freelance, Transfer, Hadiah, Investasi, Bisnis, Pendapatan Lainnya
+
+PENTING: Berikan HANYA output JSON yang valid, tanpa teks tambahan.
+
+Format output JSON:
+{
+  "valid_receipt": true/false,
+  "klasifikasi": "Pengeluaran" atau "Pendapatan",
+  "kategori": "kategori_yang_sesuai",
+  "jumlah": jumlah_dalam_angka,
+  "keterangan": "deskripsi_singkat",
+  "tanggal": "YYYY-MM-DD",
+  "confidence": "high/medium/low"
+}
+    `;
+
+    const completion = await groq.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: "You are a receipt analyzer. Return ONLY valid JSON without any additional text, comments, or explanations."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      model: "llama3-8b-8192",
+      temperature: 0.1,
+      max_tokens: 400,
+    });
+
+    let response = completion.choices[0]?.message?.content?.trim();
+    console.log('AI Receipt Analysis Raw Response:', response);
+
+    // Clean response
+    if (response.includes('```json')) {
+      response = response.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    }
+    if (response.includes('```')) {
+      response = response.replace(/```/g, '');
+    }
+
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      response = jsonMatch[0];
+    }
+
+    console.log('Cleaned Receipt Analysis Response:', response);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(response);
+    } catch (parseError) {
+      console.error('JSON Parse Error in receipt analysis:', parseError);
+      return { success: false, error: 'Failed to parse AI response' };
+    }
+
+    // Validate response
+    if (!parsed.valid_receipt) {
+      return { success: false, error: 'Bukan foto struk atau invoice yang valid' };
+    }
+
+    if (!parsed.klasifikasi || !parsed.kategori || !parsed.jumlah || !parsed.keterangan || !parsed.tanggal) {
+      console.error('Missing required fields in receipt analysis:', parsed);
+      return { success: false, error: 'Data struk tidak lengkap' };
+    }
+
+    return { success: true, data: parsed };
+
+  } catch (error) {
+    console.error('Error in receipt analysis:', error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -1027,6 +1163,87 @@ bot.on('text', async (ctx) => {
   } catch (error) {
     console.error('Error in text handler:', error);
     ctx.reply('❌ Terjadi kesalahan. Silakan coba lagi.');
+  }
+});
+
+// Handler untuk foto
+bot.on('photo', async (ctx) => {
+  const chatId = ctx.chat.id;
+
+  try {
+    // Cek apakah user sudah terdaftar
+    const userCheck = await checkUserExists(chatId);
+    if (!userCheck.success || !userCheck.exists) {
+      return ctx.reply('❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
+    }
+
+    const userData = userCheck.data;
+    const spreadsheetId = extractSpreadsheetIdFromUrl(userData.spreadsheet_link);
+
+    if (!spreadsheetId) {
+      return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
+    }
+
+    await ctx.reply('📷 Sedang memproses foto struk...');
+
+    // Dapatkan file foto dengan resolusi tertinggi
+    const photo = ctx.message.photo[ctx.message.photo.length - 1];
+    const fileLink = await ctx.telegram.getFileLink(photo.file_id);
+    
+    console.log('Photo file link:', fileLink.href);
+
+    // Proses OCR
+    const ocrResult = await processReceiptOCR(fileLink.href);
+    if (!ocrResult.success) {
+      console.error('OCR failed:', ocrResult.error);
+      return ctx.reply('❌ Gagal membaca teks dari foto. Pastikan foto struk jelas dan tidak buram.');
+    }
+
+    await ctx.reply('🤖 Sedang menganalisis struk...');
+
+    // Analisis dengan AI
+    const analysisResult = await analyzeReceiptText(ocrResult.text);
+    if (!analysisResult.success) {
+      console.error('Receipt analysis failed:', analysisResult.error);
+      
+      if (analysisResult.error.includes('Bukan foto struk')) {
+        return ctx.reply('❌ Foto yang dikirim bukan struk atau invoice yang valid. Silakan kirim foto struk belanja, invoice, atau bukti transaksi.');
+      }
+      
+      return ctx.reply('❌ Gagal menganalisis struk. Pastikan foto struk jelas dan terbaca.');
+    }
+
+    const transactionData = analysisResult.data;
+    
+    // Tentukan sheet berdasarkan klasifikasi
+    const sheetName = transactionData.klasifikasi === 'Pengeluaran' ? 'Pengeluaran' : 'Pendapatan';
+
+    // Tulis ke spreadsheet
+    const writeResult = await writeToSpreadsheet(spreadsheetId, sheetName, transactionData);
+    if (!writeResult.success) {
+      console.error('Write to spreadsheet failed:', writeResult.error);
+      return ctx.reply('❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.');
+    }
+
+    // Kirim konfirmasi
+    const confirmationMessage = `
+✅ *Berhasil mencatat dari foto struk:*
+
+📊 *Jenis:* ${transactionData.klasifikasi}
+📅 *Tanggal:* ${transactionData.tanggal}
+🏷️ *Kategori:* ${transactionData.kategori}
+💰 *Jumlah:* ${formatCurrency(transactionData.jumlah)}
+📝 *Keterangan:* ${transactionData.keterangan}
+🎯 *Tingkat Keyakinan:* ${transactionData.confidence.toUpperCase()}
+
+${transactionData.confidence === 'low' ? '⚠️ *Catatan:* Tingkat keyakinan rendah, silakan periksa kembali data di spreadsheet.' : ''}
+    `;
+
+    await ctx.replyWithMarkdown(confirmationMessage);
+
+  } catch (error) {
+    console.error('Error in photo handler:', error);
+    ctx.reply('❌ Terjadi kesalahan saat memproses foto. Silakan coba lagi.');
   }
 });
 
