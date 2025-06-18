@@ -1084,7 +1084,8 @@ bot.hears("Rekap", async (ctx) => {
       return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
     }
 
-    await ctx.reply('⏳ Sedang mengambil data rekap...');
+    // Kirim pesan proses dan simpan message id
+    const processingMessage = await ctx.reply('⏳ Sedang mengambil data rekap...');
 
     const ranges = [
       'Dashboard!B2:B5',
@@ -1097,6 +1098,7 @@ bot.hears("Rekap", async (ctx) => {
     const readResult = await readFromSpreadsheet(spreadsheetId, ranges);
     if (!readResult.success) {
       console.error('Read from spreadsheet failed:', readResult.error);
+      await ctx.deleteMessage(processingMessage.message_id);
       return ctx.reply('❌ Gagal mengambil data rekap. Pastikan spreadsheet dapat diakses.');
     }
 
@@ -1113,7 +1115,9 @@ bot.hears("Rekap", async (ctx) => {
 
     const currentDate = new Date();
     const bulan = currentDate.toLocaleString('id-ID', { month: 'long' }).toUpperCase();
-
+    
+    await ctx.deleteMessage(processingMessage.message_id);
+    
     let rekapMessage = `
 📊 <b>REKAP KEUANGAN BULAN ${bulan}</b>
 
@@ -1204,7 +1208,7 @@ Bot ini membantu Anda mencatat <b>pengeluaran</b> dan <b>pemasukan</b> harian se
 • AI keuangan
 • Spreadsheet pribadi tiap pengguna
 
-🟡 Saat ini, lebih dari <b>${totalUsers.toLocaleString('id-ID')}</b> orang yang terbantu mencatat keuangan mereka tanpa ribet lagi.
+🟡 Saat ini, lebih dari <b>${totalUsers.toLocaleString('id-ID')}</b> orang yang telah terbantu mencatat keuangan mereka tanpa ribet lagi.
 
 📊 Data Anda disimpan aman di Google Spreadsheet pribadi Anda.
   `;
@@ -1277,6 +1281,7 @@ bot.command('keluar', async (ctx) => {
     const writeResult = await writeToSpreadsheet(spreadsheetId, 'Pengeluaran', transactionData);
     if (!writeResult.success) {
       console.error('Write to spreadsheet failed:', writeResult.error);
+      await ctx.deleteMessage(processingMessage.message_id);
       return ctx.reply('❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.');
     }
 
@@ -1341,6 +1346,7 @@ bot.command('masuk', async (ctx) => {
     const writeResult = await writeToSpreadsheet(spreadsheetId, 'Pendapatan', transactionData);
     if (!writeResult.success) {
       console.error('Write to spreadsheet failed:', writeResult.error);
+      await ctx.deleteMessage(processingMessage.message_id);
       return ctx.reply('❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.');
     }
 
