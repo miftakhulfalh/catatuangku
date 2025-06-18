@@ -1260,12 +1260,14 @@ bot.command('keluar', async (ctx) => {
       return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
     }
 
-    ctx.reply('⏳ Sedang memproses pengeluaran...');
+    // Kirim pesan proses dan simpan message id
+    const processingMessage = await ctx.reply('⏳ Sedang memproses pengeluaran...');
 
     // Klasifikasi dengan AI
     const classification = await classifyTransaction(message, 'keluar');
     if (!classification.success) {
       console.error('Classification failed:', classification.error);
+      await ctx.deleteMessage(processingMessage.message_id);
       return ctx.reply('❌ Gagal menganalisis transaksi. Silakan coba lagi.');
     }
 
@@ -1277,6 +1279,9 @@ bot.command('keluar', async (ctx) => {
       console.error('Write to spreadsheet failed:', writeResult.error);
       return ctx.reply('❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.');
     }
+
+    // Hapus pesan "Sedang memproses"
+    await ctx.deleteMessage(processingMessage.message_id);
 
     // Kirim konfirmasi ke user
     const confirmationMessage = `
@@ -1378,7 +1383,9 @@ bot.command('rekap', async (ctx) => {
       return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
     }
 
-    ctx.reply('⏳ Sedang mengambil data rekap...');
+    // Kirim pesan proses dan simpan message id
+    const processingMessage = await ctx.reply('⏳ Sedang mengambil data rekap...');
+
 
     // Ranges yang akan dibaca
     const ranges = [
@@ -1392,6 +1399,7 @@ bot.command('rekap', async (ctx) => {
     const readResult = await readFromSpreadsheet(spreadsheetId, ranges);
     if (!readResult.success) {
       console.error('Read from spreadsheet failed:', readResult.error);
+      await ctx.deleteMessage(processingMessage.message_id);
       return ctx.reply('❌ Gagal mengambil data rekap. Pastikan spreadsheet dapat diakses.');
     }
 
@@ -1413,7 +1421,9 @@ bot.command('rekap', async (ctx) => {
 
     const currentDate = new Date();
     const bulan = currentDate.toLocaleString('id-ID', { month: 'long' }).toUpperCase();
-
+    // Hapus pesan "Sedang memproses"
+    await ctx.deleteMessage(processingMessage.message_id);
+    
     // Format pesan rekap
     let rekapMessage = `
 📊 *REKAP KEUANGAN BULAN ${bulan}* 📊
