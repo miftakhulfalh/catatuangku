@@ -20,7 +20,19 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 // Inisialisasi Supabase
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    },
+    global: {
+      fetch: fetch,
+    },
+    db: {
+      schema: 'public'
+    }
+  }
 );
 
 // Inisialisasi Groq AI
@@ -376,14 +388,34 @@ async function processReceiptOCRFallback(imageUrl) {
 }
 
 // Update fungsi processPhotoAsync untuk menggunakan OCR dengan fallback
-async function processPhotoAsync(ctx, chatId, photoFileId) {
+async function processPhotoSync(ctx, chatId, photoFileId) {
+  const statusMessages = [];
+  
   try {
     console.log(`Processing photo for chat ${chatId}, file: ${photoFileId}`);
 
-    // Cek apakah user sudah terdaftar
+    // Step 1: Cek user existence
+    let statusMsg = await ctx.telegram.sendMessage(chatId, '👤 Memverifikasi pengguna...');
+    statusMessages.push(statusMsg.message_id);
+
     const userCheck = await checkUserExists(chatId);
-    if (!userCheck.success || !userCheck.exists) {
-      await ctx.telegram.sendMessage(chatId, '❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
+    if (!userCheck.success) {
+      await ctx.telegram.editMessageText(
+        chatId,
+        statusMessages[0],
+        null,
+        `❌ Error verifikasi: ${userCheck.error}`
+      );
+      return;
+    }
+
+    if (!userCheck.exists) {
+      await ctx.telegram.editMessageText(
+        chatId,
+        statusMessages[0],
+        null,
+        '❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.'
+      );
       return;
     }
 
@@ -391,23 +423,45 @@ async function processPhotoAsync(ctx, chatId, photoFileId) {
     const spreadsheetId = extractSpreadsheetIdFromUrl(userData.spreadsheet_link);
 
     if (!spreadsheetId) {
-      await ctx.telegram.sendMessage(chatId, '❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
+      await ctx.telegram.editMessageText(
+        chatId,
+        statusMessages[0],
+        null,
+        '❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.'
+      );
       return;
     }
 
-    // Update status: sedang memproses OCR
-    await ctx.telegram.sendMessage(chatId, '🔍 Sedang membaca teks dari foto...');
+    // Step 2: Update status - mendapatkan file
+    await ctx.telegram.editMessageText(
+      chatId,
+      statusMessages[0],
+      null,
+      '📥 Mengunduh foto...'
+    );
 
-    // Dapatkan file foto dengan resolusi tertinggi
     const fileLink = await ctx.telegram.getFileLink(photoFileId);
     console.log('Photo file link:', fileLink.href);
+
+    // Step 3: Update status - OCR processing
+    await ctx.telegram.editMessageText(
+      chatId,
+      statusMessages[0],
+      null,
+      '🔍 Membaca teks dari foto...'
+    );
 
     // Coba OCR custom terlebih dahulu, fallback ke OCR.space jika gagal
     let ocrResult = await processReceiptOCR(fileLink.href);
     
     if (!ocrResult.success && process.env.OCR_SPACE_API_KEY) {
       console.log('Custom OCR failed, trying fallback...');
-      await ctx.telegram.sendMessage(chatId, '🔄 Mencoba metode OCR alternatif...');
+      await ctx.telegram.editMessageText(
+        chatId,
+        statusMessages[0],
+        null,
+        '🔄 Mencoba metode OCR alternatif...'
+      );
       ocrResult = await processReceiptOCRFallback(fileLink.href);
     }
 
@@ -416,16 +470,21 @@ async function processPhotoAsync(ctx, chatId, photoFileId) {
       
       let errorMessage = '❌ Gagal membaca teks dari foto.';
       if (ocrResult.error.includes('timeout')) {
-        errorMessage += ' Koneksi timeout, silakan coba lagi dengan foto yang lebih kecil.';
+        errorMessage += '\n⏱️ Koneksi timeout, silakan coba lagi dengan foto yang lebih kecil.';
       } else {
-        errorMessage += ' Pastikan foto struk jelas dan tidak buram.';
+        errorMessage += '\n📷 Pastikan foto struk jelas dan tidak buram.';
       }
       
-      await ctx.telegram.sendMessage(chatId, errorMessage);
+      await ctx.telegram.editMessageText(
+        chatId,
+        statusMessages[0],
+        null,
+        errorMessage
+      );
       return;
     }
 
-    // Tambahkan info processing time jika tersedia
+    // Step 4: Update status - AI analysis
     let ocrInfo = '';
     if (ocrResult.processingTime) {
       ocrInfo = ` (${(ocrResult.processingTime / 1000).toFixed(1)}s)`;
@@ -434,8 +493,12 @@ async function processPhotoAsync(ctx, chatId, photoFileId) {
       ocrInfo += ` - Confidence: ${Math.round(ocrResult.confidence)}%`;
     }
 
-    // Update status: sedang menganalisis
-    await ctx.telegram.sendMessage(chatId, `🤖 Sedang menganalisis data struk...${ocrInfo}`);
+    await ctx.telegram.editMessageText(
+      chatId,
+      statusMessages[0],
+      null,
+      `🤖 Menganalisis data struk...${ocrInfo}`
+    );
 
     // Analisis dengan AI
     const analysisResult = await analyzeReceiptText(ocrResult.text);
@@ -444,17 +507,27 @@ async function processPhotoAsync(ctx, chatId, photoFileId) {
       
       let errorMessage = '❌ Gagal menganalisis struk.';
       if (analysisResult.error.includes('Bukan foto struk')) {
-        errorMessage = '❌ Foto yang dikirim bukan struk atau invoice yang valid. Silakan kirim foto struk belanja, invoice, atau bukti transaksi.';
+        errorMessage = '❌ Foto yang dikirim bukan struk atau invoice yang valid.\n📄 Silakan kirim foto struk belanja, invoice, atau bukti transaksi.';
       }
       
-      await ctx.telegram.sendMessage(chatId, errorMessage);
+      await ctx.telegram.editMessageText(
+        chatId,
+        statusMessages[0],
+        null,
+        errorMessage
+      );
       return;
     }
 
     const transactionData = analysisResult.data;
     
-    // Update status: sedang menyimpan
-    await ctx.telegram.sendMessage(chatId, '💾 Sedang menyimpan ke spreadsheet...');
+    // Step 5: Update status - saving to spreadsheet
+    await ctx.telegram.editMessageText(
+      chatId,
+      statusMessages[0],
+      null,
+      '💾 Menyimpan ke spreadsheet...'
+    );
 
     // Tentukan sheet berdasarkan klasifikasi
     const sheetName = transactionData.klasifikasi === 'Pengeluaran' ? 'Pengeluaran' : 'Pendapatan';
@@ -463,11 +536,18 @@ async function processPhotoAsync(ctx, chatId, photoFileId) {
     const writeResult = await writeToSpreadsheet(spreadsheetId, sheetName, transactionData);
     if (!writeResult.success) {
       console.error('Write to spreadsheet failed:', writeResult.error);
-      await ctx.telegram.sendMessage(chatId, '❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.');
+      await ctx.telegram.editMessageText(
+        chatId,
+        statusMessages[0],
+        null,
+        '❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.'
+      );
       return;
     }
 
-    // Kirim konfirmasi sukses
+    // Step 6: Kirim konfirmasi sukses (hapus status message dan kirim hasil)
+    await ctx.telegram.deleteMessage(chatId, statusMessages[0]);
+
     const confirmationMessage = `
 ✅ *Berhasil mencatat dari foto struk:*
 
@@ -486,8 +566,21 @@ ${transactionData.confidence === 'low' ? '⚠️ *Catatan:* Tingkat keyakinan re
     console.log(`Successfully processed photo for chat ${chatId}`);
 
   } catch (error) {
-    console.error('Error in processPhotoAsync:', error);
-    await ctx.telegram.sendMessage(chatId, '❌ Terjadi kesalahan saat memproses foto. Silakan coba lagi.');
+    console.error('Error in processPhotoSync:', error);
+    
+    // Cleanup status messages
+    for (const msgId of statusMessages) {
+      try {
+        await ctx.telegram.deleteMessage(chatId, msgId);
+      } catch (e) {
+        console.error('Error deleting status message:', e);
+      }
+    }
+    
+    await ctx.telegram.sendMessage(
+      chatId, 
+      `❌ Terjadi kesalahan saat memproses foto: ${error.message}\n\n🔄 Silakan coba lagi dalam beberapa menit.`
+    );
   }
 }
 // Fungsi untuk menganalisis teks struk dengan AI
@@ -1405,20 +1498,12 @@ bot.on('photo', async (ctx) => {
   const photo = ctx.message.photo[ctx.message.photo.length - 1];
   
   try {
-    // Kirim konfirmasi penerimaan foto segera
-    await ctx.reply('📷 Foto diterima! Sedang memproses...');
-    
-    // Proses foto secara asinkron tanpa menunggu
-    setImmediate(() => {
-      processPhotoAsync(ctx, chatId, photo.file_id).catch(error => {
-        console.error('Error in background photo processing:', error);
-        ctx.telegram.sendMessage(chatId, '❌ Terjadi kesalahan saat memproses foto. Silakan coba lagi.').catch(console.error);
-      });
-    });
+    // Proses foto secara sinkron dengan update status real-time
+    await processPhotoSync(ctx, chatId, photo.file_id);
 
   } catch (error) {
     console.error('Error in photo handler:', error);
-    ctx.reply('❌ Terjadi kesalahan. Silakan coba lagi.');
+    await ctx.reply(`❌ Terjadi kesalahan: ${error.message}\n\n🔄 Silakan coba lagi.`);
   }
 });
 // Handler untuk callback "Ya" (ganti folder)
