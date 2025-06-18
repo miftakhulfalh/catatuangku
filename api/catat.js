@@ -263,7 +263,7 @@ async function resizeImageForOCR(imageBuffer, maxWidth = 1024) {
 }
 
 // Update fungsi processReceiptOCR di bot utama
-async function processReceiptOCR(imageUrl) {
+async function processReceiptOCROptimized(imageUrl) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 25000); // 50 detik timeout
   
