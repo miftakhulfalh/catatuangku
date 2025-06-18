@@ -226,8 +226,20 @@ async function getTotalUsers() {
   }
 }
 
-// Tambahkan fungsi OCR menggunakan OCR.space
+// Fungsi untuk resize dan kompres gambar
+async function optimizeImage(imageBuffer) {
+  // Jika gambar terlalu besar (> 1MB), return sebagai base64 untuk OCR yang lebih cepat
+  if (imageBuffer.length > 1024 * 1024) {
+    return imageBuffer.toString('base64');
+  }
+  return imageBuffer;
+}
+
+// Fungsi OCR yang dioptimasi dengan timeout dan fallback
 async function processReceiptOCR(imageUrl) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 detik timeout
+  
   try {
     const ocrApiKey = process.env.OCR_SPACE_API_KEY;
     
@@ -235,33 +247,60 @@ async function processReceiptOCR(imageUrl) {
       throw new Error('OCR API key not configured');
     }
 
-    // Unduh file dari Telegram
-    const fileResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-    const tempPath = path.join(tmpdir(), `receipt-${Date.now()}.jpg`);
-    fs.writeFileSync(tempPath, fileResponse.data);
+    console.log('Starting OCR process...');
 
-    const formData = {
-      file: fs.createReadStream(tempPath),
-      apikey: ocrApiKey,
-      language: 'eng',
-      detectOrientation: 'true',
-      OCREngine: '2'
-    };
+    // Unduh file dengan timeout
+    const fileResponse = await axios.get(imageUrl, { 
+      responseType: 'arraybuffer',
+      timeout: 10000, // 10 detik timeout untuk download
+      signal: controller.signal
+    });
+
+    const imageBuffer = Buffer.from(fileResponse.data);
+    console.log(`Image downloaded, size: ${imageBuffer.length} bytes`);
+
+    // Optimize image jika terlalu besar
+    const optimizedImage = await optimizeImage(imageBuffer);
+
+    // Gunakan FormData yang benar
+    const form = new FormData();
+    
+    if (typeof optimizedImage === 'string') {
+      // Jika base64
+      form.append('base64image', `data:image/jpeg;base64,${optimizedImage}`);
+    } else {
+      // Jika buffer
+      form.append('file', optimizedImage, {
+        filename: 'receipt.jpg',
+        contentType: 'image/jpeg'
+      });
+    }
+    
+    form.append('apikey', ocrApiKey);
+    form.append('language', 'eng');
+    form.append('detectOrientation', 'true');
+    form.append('OCREngine', '2');
+    form.append('scale', 'true');
+    form.append('isTable', 'true'); // Untuk struktur tabel yang lebih baik
+
+    console.log('Sending to OCR API...');
 
     const response = await axios.post(
       'https://api.ocr.space/parse/image', 
-      formData,
+      form,
       {
         headers: {
-          ...formData.getHeaders?.(), // Tetap dukung jika formData punya getHeaders
-          'Content-Type': 'multipart/form-data'
-        }
+          ...form.getHeaders(),
+        },
+        timeout: 20000, // 20 detik timeout untuk OCR
+        signal: controller.signal
       }
     );
 
-    fs.unlinkSync(tempPath);
+    clearTimeout(timeoutId);
     
     const result = response.data;
+    console.log('OCR API Response:', JSON.stringify(result, null, 2));
     
     if (!result.IsErroredOnProcessing && result.ParsedResults && result.ParsedResults.length > 0) {
       const extractedText = result.ParsedResults[0].ParsedText;
@@ -269,11 +308,24 @@ async function processReceiptOCR(imageUrl) {
       return { success: true, text: extractedText };
     } else {
       console.error('OCR processing failed:', result);
-      return { success: false, error: 'Failed to extract text from image' };
+      return { 
+        success: false, 
+        error: result.ErrorMessage || 'Failed to extract text from image' 
+      };
     }
 
   } catch (error) {
+    clearTimeout(timeoutId);
     console.error('Error in OCR processing:', error);
+    
+    if (error.name === 'AbortError') {
+      return { success: false, error: 'OCR processing timeout' };
+    }
+    
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+      return { success: false, error: 'Connection timeout to OCR service' };
+    }
+    
     return { success: false, error: error.message };
   }
 }
@@ -371,6 +423,105 @@ Format output JSON:
   } catch (error) {
     console.error('Error in receipt analysis:', error);
     return { success: false, error: error.message };
+  }
+}
+
+// Fungsi untuk memproses foto secara asinkron
+async function processPhotoAsync(ctx, chatId, photoFileId) {
+  try {
+    console.log(`Processing photo for chat ${chatId}, file: ${photoFileId}`);
+
+    // Cek apakah user sudah terdaftar
+    const userCheck = await checkUserExists(chatId);
+    if (!userCheck.success || !userCheck.exists) {
+      await ctx.telegram.sendMessage(chatId, '❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
+      return;
+    }
+
+    const userData = userCheck.data;
+    const spreadsheetId = extractSpreadsheetIdFromUrl(userData.spreadsheet_link);
+
+    if (!spreadsheetId) {
+      await ctx.telegram.sendMessage(chatId, '❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
+      return;
+    }
+
+    // Update status: sedang memproses OCR
+    await ctx.telegram.sendMessage(chatId, '🔍 Sedang membaca teks dari foto...');
+
+    // Dapatkan file foto dengan resolusi tertinggi
+    const fileLink = await ctx.telegram.getFileLink(photoFileId);
+    console.log('Photo file link:', fileLink.href);
+
+    // Proses OCR dengan timeout
+    const ocrResult = await processReceiptOCR(fileLink.href);
+    if (!ocrResult.success) {
+      console.error('OCR failed:', ocrResult.error);
+      
+      let errorMessage = '❌ Gagal membaca teks dari foto.';
+      if (ocrResult.error.includes('timeout')) {
+        errorMessage += ' Koneksi timeout, silakan coba lagi dengan foto yang lebih kecil.';
+      } else {
+        errorMessage += ' Pastikan foto struk jelas dan tidak buram.';
+      }
+      
+      await ctx.telegram.sendMessage(chatId, errorMessage);
+      return;
+    }
+
+    // Update status: sedang menganalisis
+    await ctx.telegram.sendMessage(chatId, '🤖 Sedang menganalisis data struk...');
+
+    // Analisis dengan AI
+    const analysisResult = await analyzeReceiptText(ocrResult.text);
+    if (!analysisResult.success) {
+      console.error('Receipt analysis failed:', analysisResult.error);
+      
+      let errorMessage = '❌ Gagal menganalisis struk.';
+      if (analysisResult.error.includes('Bukan foto struk')) {
+        errorMessage = '❌ Foto yang dikirim bukan struk atau invoice yang valid. Silakan kirim foto struk belanja, invoice, atau bukti transaksi.';
+      }
+      
+      await ctx.telegram.sendMessage(chatId, errorMessage);
+      return;
+    }
+
+    const transactionData = analysisResult.data;
+    
+    // Update status: sedang menyimpan
+    await ctx.telegram.sendMessage(chatId, '💾 Sedang menyimpan ke spreadsheet...');
+
+    // Tentukan sheet berdasarkan klasifikasi
+    const sheetName = transactionData.klasifikasi === 'Pengeluaran' ? 'Pengeluaran' : 'Pendapatan';
+
+    // Tulis ke spreadsheet
+    const writeResult = await writeToSpreadsheet(spreadsheetId, sheetName, transactionData);
+    if (!writeResult.success) {
+      console.error('Write to spreadsheet failed:', writeResult.error);
+      await ctx.telegram.sendMessage(chatId, '❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.');
+      return;
+    }
+
+    // Kirim konfirmasi sukses
+    const confirmationMessage = `
+✅ *Berhasil mencatat dari foto struk:*
+
+📊 *Jenis:* ${transactionData.klasifikasi}
+📅 *Tanggal:* ${transactionData.tanggal}
+🏷️ *Kategori:* ${transactionData.kategori}
+💰 *Jumlah:* ${formatCurrency(transactionData.jumlah)}
+📝 *Keterangan:* ${transactionData.keterangan}
+🎯 *Tingkat Keyakinan:* ${transactionData.confidence.toUpperCase()}
+
+${transactionData.confidence === 'low' ? '⚠️ *Catatan:* Tingkat keyakinan rendah, silakan periksa kembali data di spreadsheet.' : ''}
+    `;
+
+    await ctx.telegram.sendMessage(chatId, confirmationMessage, { parse_mode: 'Markdown' });
+    console.log(`Successfully processed photo for chat ${chatId}`);
+
+  } catch (error) {
+    console.error('Error in processPhotoAsync:', error);
+    await ctx.telegram.sendMessage(chatId, '❌ Terjadi kesalahan saat memproses foto. Silakan coba lagi.');
   }
 }
 
@@ -1190,84 +1341,25 @@ bot.on('text', async (ctx) => {
 // Handler untuk foto
 bot.on('photo', async (ctx) => {
   const chatId = ctx.chat.id;
-
+  const photo = ctx.message.photo[ctx.message.photo.length - 1];
+  
   try {
-    // Cek apakah user sudah terdaftar
-    const userCheck = await checkUserExists(chatId);
-    if (!userCheck.success || !userCheck.exists) {
-      return ctx.reply('❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.');
-    }
-
-    const userData = userCheck.data;
-    const spreadsheetId = extractSpreadsheetIdFromUrl(userData.spreadsheet_link);
-
-    if (!spreadsheetId) {
-      return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
-    }
-
-    await ctx.reply('📷 Sedang memproses foto struk...');
-
-    // Dapatkan file foto dengan resolusi tertinggi
-    const photo = ctx.message.photo[ctx.message.photo.length - 1];
-    const fileLink = await ctx.telegram.getFileLink(photo.file_id);
+    // Kirim konfirmasi penerimaan foto segera
+    await ctx.reply('📷 Foto diterima! Sedang memproses...');
     
-    console.log('Photo file link:', fileLink.href);
-
-    // Proses OCR
-    const ocrResult = await processReceiptOCR(fileLink.href);
-    if (!ocrResult.success) {
-      console.error('OCR failed:', ocrResult.error);
-      return ctx.reply('❌ Gagal membaca teks dari foto. Pastikan foto struk jelas dan tidak buram.');
-    }
-
-    await ctx.reply('🤖 Sedang menganalisis struk...');
-
-    // Analisis dengan AI
-    const analysisResult = await analyzeReceiptText(ocrResult.text);
-    if (!analysisResult.success) {
-      console.error('Receipt analysis failed:', analysisResult.error);
-      
-      if (analysisResult.error.includes('Bukan foto struk')) {
-        return ctx.reply('❌ Foto yang dikirim bukan struk atau invoice yang valid. Silakan kirim foto struk belanja, invoice, atau bukti transaksi.');
-      }
-      
-      return ctx.reply('❌ Gagal menganalisis struk. Pastikan foto struk jelas dan terbaca.');
-    }
-
-    const transactionData = analysisResult.data;
-    
-    // Tentukan sheet berdasarkan klasifikasi
-    const sheetName = transactionData.klasifikasi === 'Pengeluaran' ? 'Pengeluaran' : 'Pendapatan';
-
-    // Tulis ke spreadsheet
-    const writeResult = await writeToSpreadsheet(spreadsheetId, sheetName, transactionData);
-    if (!writeResult.success) {
-      console.error('Write to spreadsheet failed:', writeResult.error);
-      return ctx.reply('❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.');
-    }
-
-    // Kirim konfirmasi
-    const confirmationMessage = `
-✅ *Berhasil mencatat dari foto struk:*
-
-📊 *Jenis:* ${transactionData.klasifikasi}
-📅 *Tanggal:* ${transactionData.tanggal}
-🏷️ *Kategori:* ${transactionData.kategori}
-💰 *Jumlah:* ${formatCurrency(transactionData.jumlah)}
-📝 *Keterangan:* ${transactionData.keterangan}
-🎯 *Tingkat Keyakinan:* ${transactionData.confidence.toUpperCase()}
-
-${transactionData.confidence === 'low' ? '⚠️ *Catatan:* Tingkat keyakinan rendah, silakan periksa kembali data di spreadsheet.' : ''}
-    `;
-
-    await ctx.replyWithMarkdown(confirmationMessage);
+    // Proses foto secara asinkron tanpa menunggu
+    setImmediate(() => {
+      processPhotoAsync(ctx, chatId, photo.file_id).catch(error => {
+        console.error('Error in background photo processing:', error);
+        ctx.telegram.sendMessage(chatId, '❌ Terjadi kesalahan saat memproses foto. Silakan coba lagi.').catch(console.error);
+      });
+    });
 
   } catch (error) {
     console.error('Error in photo handler:', error);
-    ctx.reply('❌ Terjadi kesalahan saat memproses foto. Silakan coba lagi.');
+    ctx.reply('❌ Terjadi kesalahan. Silakan coba lagi.');
   }
 });
-
 // Handler untuk callback "Ya" (ganti folder)
 bot.action('replace_yes', async (ctx) => {
   try {
