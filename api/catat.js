@@ -1319,12 +1319,14 @@ bot.command('masuk', async (ctx) => {
       return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
     }
 
-    ctx.reply('⏳ Sedang memproses pendapatan...');
+    // Kirim pesan proses dan simpan message id
+    const processingMessage = await ctx.reply('⏳ Sedang memproses pendapatan...');
 
     // Klasifikasi dengan AI
     const classification = await classifyTransaction(message, 'masuk');
     if (!classification.success) {
       console.error('Classification failed:', classification.error);
+      await ctx.deleteMessage(processingMessage.message_id);
       return ctx.reply('❌ Gagal menganalisis transaksi. Silakan coba lagi.');
     }
 
@@ -1336,6 +1338,9 @@ bot.command('masuk', async (ctx) => {
       console.error('Write to spreadsheet failed:', writeResult.error);
       return ctx.reply('❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.');
     }
+
+    // Hapus pesan "Sedang memproses"
+    await ctx.deleteMessage(processingMessage.message_id);
 
     // Kirim konfirmasi ke user
     const confirmationMessage = `
