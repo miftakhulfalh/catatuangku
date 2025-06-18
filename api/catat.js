@@ -239,51 +239,73 @@ async function getTotalUsers() {
 }
 
 // Fungsi untuk resize dan kompres gambar
-async function optimizeImage(imageBuffer) {
-  // Jika gambar terlalu besar (> 1MB), return sebagai base64 untuk OCR yang lebih cepat
-  if (imageBuffer.length > 1024 * 1024) {
-    return imageBuffer.toString('base64');
+const processingSet = new Set(); // Untuk mencegah duplikasi proses
+
+// Fungsi untuk resize gambar sebelum OCR (mengurangi ukuran file)
+async function resizeImageForOCR(imageBuffer, maxWidth = 1024) {
+  try {
+    // Jika Anda menggunakan sharp library (install: npm install sharp)
+    const sharp = require('sharp');
+    
+    const resized = await sharp(imageBuffer)
+      .resize(maxWidth, null, { 
+        withoutEnlargement: true,
+        fit: 'inside'
+      })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    
+    return resized;
+  } catch (error) {
+    console.log('Sharp not available, using original image:', error.message);
+    return imageBuffer;
   }
-  return imageBuffer;
 }
 
 // Update fungsi processReceiptOCR di bot utama
 async function processReceiptOCR(imageUrl) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 detik timeout
+  const timeoutId = setTimeout(() => controller.abort(), 25000); // 50 detik timeout
   
   try {
     console.log('Starting custom Tesseract OCR process...');
 
     // URL API Tesseract Anda sendiri
-    const OCR_API_URL = process.env.CUSTOM_OCR_API_URL || 'https://your-tesseract-api.vercel.app/api/ocr';
+    const OCR_API_URL = process.env.CUSTOM_OCR_API_URL || 'https://tesseract.vercel.app/api/ocr';
 
     // Unduh gambar terlebih dahulu
     const fileResponse = await axios.get(imageUrl, { 
       responseType: 'arraybuffer',
-      timeout: 15000,
-      signal: controller.signal
+      timeout: 8000, // Kurangi timeout download
+      signal: controller.signal,
+      maxContentLength: 5 * 1024 * 1024, // Max 5MB
+      maxBodyLength: 5 * 1024 * 1024
     });
+    
+    let imageBuffer = Buffer.from(fileResponse.data);
+    
+    // Resize gambar jika terlalu besar
+    if (imageBuffer.length > 2 * 1024 * 1024) { // Jika lebih dari 2MB
+      console.log(`Resizing large image: ${imageBuffer.length} bytes`);
+      imageBuffer = await resizeImageForOCR(imageBuffer);
+      console.log(`Resized to: ${imageBuffer.length} bytes`);
+    }
 
-    const imageBuffer = Buffer.from(fileResponse.data);
     const base64Image = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`;
     
-    console.log(`Image downloaded, size: ${imageBuffer.length} bytes`);
-
-    // Kirim ke API Tesseract custom
+    // Kirim ke API dengan timeout yang lebih kecil
     const response = await axios.post(
       OCR_API_URL,
       {
         imageBase64: base64Image,
         options: {
-          // Konfigurasi khusus untuk struk/receipt
           tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:-/ ',
-          tessedit_pageseg_mode: '6', // Uniform block of text
-          tessedit_ocr_engine_mode: '1' // Neural nets LSTM engine only
+          tessedit_pageseg_mode: '6',
+          tessedit_ocr_engine_mode: '1'
         }
       },
       {
-        timeout: 45000, // 45 detik timeout
+        timeout: 20000, // Kurangi timeout API call
         signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
@@ -294,10 +316,8 @@ async function processReceiptOCR(imageUrl) {
     clearTimeout(timeoutId);
     
     const result = response.data;
-    console.log('Custom OCR API Response:', result);
     
     if (result.success && result.text) {
-      console.log('OCR extracted text:', result.text);
       return { 
         success: true, 
         text: result.text,
@@ -305,7 +325,6 @@ async function processReceiptOCR(imageUrl) {
         processingTime: result.processingTime
       };
     } else {
-      console.error('Custom OCR processing failed:', result);
       return { 
         success: false, 
         error: result.error || 'Failed to extract text from image' 
@@ -314,44 +333,50 @@ async function processReceiptOCR(imageUrl) {
 
   } catch (error) {
     clearTimeout(timeoutId);
-    console.error('Error in custom OCR processing:', error);
+    console.error('Error in optimized OCR processing:', error);
     
     if (error.name === 'AbortError') {
-      return { success: false, error: 'OCR processing timeout' };
+      return { success: false, error: 'OCR processing timeout (25s)' };
     }
     
     if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
       return { success: false, error: 'Connection timeout to OCR service' };
     }
     
-    if (error.response) {
-      return { 
-        success: false, 
-        error: `OCR API error: ${error.response.status} - ${error.response.data?.error || 'Unknown error'}` 
-      };
-    }
-    
     return { success: false, error: error.message };
   }
 }
 
-// Fungsi OCR fallback jika custom API tidak tersedia
-async function processReceiptOCRFallback(imageUrl) {
+// Fallback OCR yang lebih cepat
+async function processReceiptOCRFallbackOptimized(imageUrl) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 detik timeout
+  
   try {
-    console.log('Using fallback OCR.space API...');
+    console.log('Using optimized fallback OCR.space API...');
     
     const ocrApiKey = process.env.OCR_SPACE_API_KEY;
     if (!ocrApiKey) {
       throw new Error('OCR API key not configured');
     }
 
+    // Download dengan timeout kecil
     const fileResponse = await axios.get(imageUrl, { 
       responseType: 'arraybuffer',
-      timeout: 10000
+      timeout: 5000, // 5 detik untuk download
+      signal: controller.signal,
+      maxContentLength: 3 * 1024 * 1024 // Max 3MB
     });
 
+    let imageBuffer = Buffer.from(fileResponse.data);
+    
+    // Resize jika perlu
+    if (imageBuffer.length > 1.5 * 1024 * 1024) { // Jika lebih dari 1.5MB
+      imageBuffer = await resizeImageForOCR(imageBuffer, 800); // Resize ke 800px max
+    }
+
     const form = new FormData();
-    form.append('file', Buffer.from(fileResponse.data), {
+    form.append('file', imageBuffer, {
       filename: 'receipt.jpg',
       contentType: 'image/jpeg'
     });
@@ -359,16 +384,20 @@ async function processReceiptOCRFallback(imageUrl) {
     form.append('language', 'eng');
     form.append('detectOrientation', 'true');
     form.append('OCREngine', '2');
+    form.append('scale', 'true'); // Auto-scale untuk hasil lebih baik
+    form.append('isTable', 'true'); // Optimized untuk table/receipt
 
     const response = await axios.post(
       'https://api.ocr.space/parse/image', 
       form,
       {
         headers: { ...form.getHeaders() },
-        timeout: 20000
+        timeout: 12000, // 12 detik timeout
+        signal: controller.signal
       }
     );
     
+    clearTimeout(timeoutId);
     const result = response.data;
     
     if (!result.IsErroredOnProcessing && result.ParsedResults && result.ParsedResults.length > 0) {
@@ -382,39 +411,66 @@ async function processReceiptOCRFallback(imageUrl) {
     }
 
   } catch (error) {
-    console.error('Fallback OCR error:', error);
+    clearTimeout(timeoutId);
+    console.error('Optimized fallback OCR error:', error);
+    
+    if (error.name === 'AbortError') {
+      return { success: false, error: 'Fallback OCR timeout (15s)' };
+    }
+    
     return { success: false, error: error.message };
   }
 }
 
-// Update fungsi processPhotoAsync untuk menggunakan OCR dengan fallback
-async function processPhotoSync(ctx, chatId, photoFileId) {
+// Fungsi untuk mencegah proses duplikasi
+function createProcessingKey(chatId, fileId) {
+  return `${chatId}_${fileId}`;
+}
+
+// Versi processPhotoSync yang dioptimalkan dengan timeout management
+async function processPhotoSyncOptimized(ctx, chatId, photoFileId) {
+  const processingKey = createProcessingKey(chatId, photoFileId);
+  
+  // Cek apakah sedang diproses
+  if (processingSet.has(processingKey)) {
+    console.log(`Photo ${photoFileId} already being processed for chat ${chatId}`);
+    await ctx.reply('📸 Foto sedang diproses, mohon tunggu...');
+    return;
+  }
+
+  // Tandai sebagai sedang diproses
+  processingSet.add(processingKey);
+  
+  // Timeout untuk seluruh proses (50 detik untuk Vercel)
+  const globalTimeout = setTimeout(() => {
+    processingSet.delete(processingKey);
+    console.log(`Global timeout reached for ${processingKey}`);
+  }, 50000);
+
   const statusMessages = [];
   
   try {
     console.log(`Processing photo for chat ${chatId}, file: ${photoFileId}`);
 
-    // Step 1: Cek user existence
-    let statusMsg = await ctx.telegram.sendMessage(chatId, '👤 Memverifikasi pengguna...');
+    // Step 1: Quick user check
+    let statusMsg = await ctx.telegram.sendMessage(chatId, '👤 Memverifikasi...');
     statusMessages.push(statusMsg.message_id);
 
-    const userCheck = await checkUserExists(chatId);
-    if (!userCheck.success) {
-      await ctx.telegram.editMessageText(
-        chatId,
-        statusMessages[0],
-        null,
-        `❌ Error verifikasi: ${userCheck.error}`
-      );
-      return;
-    }
+    const userCheck = await Promise.race([
+      checkUserExists(chatId),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('User check timeout')), 8000)
+      )
+    ]);
 
-    if (!userCheck.exists) {
+    if (!userCheck.success || !userCheck.exists) {
       await ctx.telegram.editMessageText(
         chatId,
         statusMessages[0],
         null,
-        '❌ Anda belum terdaftar. Silakan kirimkan link folder Google Drive terlebih dahulu.'
+        !userCheck.success ? 
+          `❌ Error: ${userCheck.error}` : 
+          '❌ Belum terdaftar. Kirim link Google Drive dulu.'
       );
       return;
     }
@@ -427,12 +483,12 @@ async function processPhotoSync(ctx, chatId, photoFileId) {
         chatId,
         statusMessages[0],
         null,
-        '❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.'
+        '❌ Spreadsheet tidak valid. Setup ulang dengan link folder.'
       );
       return;
     }
 
-    // Step 2: Update status - mendapatkan file
+    // Step 2: Get file with quick timeout
     await ctx.telegram.editMessageText(
       chatId,
       statusMessages[0],
@@ -440,39 +496,40 @@ async function processPhotoSync(ctx, chatId, photoFileId) {
       '📥 Mengunduh foto...'
     );
 
-    const fileLink = await ctx.telegram.getFileLink(photoFileId);
-    console.log('Photo file link:', fileLink.href);
+    const fileLink = await Promise.race([
+      ctx.telegram.getFileLink(photoFileId),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('File link timeout')), 5000)
+      )
+    ]);
 
-    // Step 3: Update status - OCR processing
+    // Step 3: OCR with aggressive timeout
     await ctx.telegram.editMessageText(
       chatId,
       statusMessages[0],
       null,
-      '🔍 Membaca teks dari foto...'
+      '🔍 Membaca teks (max 25s)...'
     );
 
-    // Coba OCR custom terlebih dahulu, fallback ke OCR.space jika gagal
-    let ocrResult = await processReceiptOCR(fileLink.href);
+    // Coba OCR optimized
+    let ocrResult = await processReceiptOCROptimized(fileLink.href);
     
+    // Fallback jika gagal dan masih ada waktu
     if (!ocrResult.success && process.env.OCR_SPACE_API_KEY) {
-      console.log('Custom OCR failed, trying fallback...');
+      console.log('Custom OCR failed, trying optimized fallback...');
       await ctx.telegram.editMessageText(
         chatId,
         statusMessages[0],
         null,
-        '🔄 Mencoba metode OCR alternatif...'
+        '🔄 Mencoba metode alternatif...'
       );
-      ocrResult = await processReceiptOCRFallback(fileLink.href);
+      ocrResult = await processReceiptOCRFallbackOptimized(fileLink.href);
     }
 
     if (!ocrResult.success) {
-      console.error('All OCR methods failed:', ocrResult.error);
-      
-      let errorMessage = '❌ Gagal membaca teks dari foto.';
+      let errorMessage = '❌ Gagal membaca foto.';
       if (ocrResult.error.includes('timeout')) {
-        errorMessage += '\n⏱️ Koneksi timeout, silakan coba lagi dengan foto yang lebih kecil.';
-      } else {
-        errorMessage += '\n📷 Pastikan foto struk jelas dan tidak buram.';
+        errorMessage += '\n⏱️ Timeout - coba foto lebih kecil/jelas.';
       }
       
       await ctx.telegram.editMessageText(
@@ -484,103 +541,104 @@ async function processPhotoSync(ctx, chatId, photoFileId) {
       return;
     }
 
-    // Step 4: Update status - AI analysis
-    let ocrInfo = '';
-    if (ocrResult.processingTime) {
-      ocrInfo = ` (${(ocrResult.processingTime / 1000).toFixed(1)}s)`;
-    }
-    if (ocrResult.confidence) {
-      ocrInfo += ` - Confidence: ${Math.round(ocrResult.confidence)}%`;
-    }
-
+    // Step 4: Quick AI analysis
     await ctx.telegram.editMessageText(
       chatId,
       statusMessages[0],
       null,
-      `🤖 Menganalisis data struk...${ocrInfo}`
+      '🤖 Menganalisis (max 10s)...'
     );
 
-    // Analisis dengan AI
-    const analysisResult = await analyzeReceiptText(ocrResult.text);
+    const analysisResult = await Promise.race([
+      analyzeReceiptText(ocrResult.text),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Analysis timeout')), 10000)
+      )
+    ]);
+
     if (!analysisResult.success) {
-      console.error('Receipt analysis failed:', analysisResult.error);
-      
-      let errorMessage = '❌ Gagal menganalisis struk.';
-      if (analysisResult.error.includes('Bukan foto struk')) {
-        errorMessage = '❌ Foto yang dikirim bukan struk atau invoice yang valid.\n📄 Silakan kirim foto struk belanja, invoice, atau bukti transaksi.';
-      }
-      
       await ctx.telegram.editMessageText(
         chatId,
         statusMessages[0],
         null,
-        errorMessage
+        analysisResult.error.includes('Bukan foto struk') ?
+          '❌ Bukan foto struk yang valid.' :
+          '❌ Gagal menganalisis struk.'
       );
       return;
     }
+
+    // Step 5: Quick save to spreadsheet
+    await ctx.telegram.editMessageText(
+      chatId,
+      statusMessages[0],
+      null,
+      '💾 Menyimpan...'
+    );
 
     const transactionData = analysisResult.data;
-    
-    // Step 5: Update status - saving to spreadsheet
-    await ctx.telegram.editMessageText(
-      chatId,
-      statusMessages[0],
-      null,
-      '💾 Menyimpan ke spreadsheet...'
-    );
-
-    // Tentukan sheet berdasarkan klasifikasi
     const sheetName = transactionData.klasifikasi === 'Pengeluaran' ? 'Pengeluaran' : 'Pendapatan';
 
-    // Tulis ke spreadsheet
-    const writeResult = await writeToSpreadsheet(spreadsheetId, sheetName, transactionData);
+    const writeResult = await Promise.race([
+      writeToSpreadsheet(spreadsheetId, sheetName, transactionData),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Write timeout')), 8000)
+      )
+    ]);
+
     if (!writeResult.success) {
-      console.error('Write to spreadsheet failed:', writeResult.error);
       await ctx.telegram.editMessageText(
         chatId,
         statusMessages[0],
         null,
-        '❌ Gagal mencatat ke spreadsheet. Silakan coba lagi.'
+        '❌ Gagal menyimpan ke spreadsheet.'
       );
       return;
     }
 
-    // Step 6: Kirim konfirmasi sukses (hapus status message dan kirim hasil)
+    // Success - cleanup and send result
     await ctx.telegram.deleteMessage(chatId, statusMessages[0]);
 
     const confirmationMessage = `
-✅ *Berhasil mencatat dari foto struk:*
+✅ *Berhasil tercatat:*
 
 📊 *Jenis:* ${transactionData.klasifikasi}
 📅 *Tanggal:* ${transactionData.tanggal}
 🏷️ *Kategori:* ${transactionData.kategori}
 💰 *Jumlah:* ${formatCurrency(transactionData.jumlah)}
 📝 *Keterangan:* ${transactionData.keterangan}
-🎯 *Tingkat Keyakinan:* ${transactionData.confidence.toUpperCase()}
-${ocrInfo ? `📊 *OCR Info:* ${ocrInfo}` : ''}
+🎯 *Keyakinan:* ${transactionData.confidence.toUpperCase()}
 
-${transactionData.confidence === 'low' ? '⚠️ *Catatan:* Tingkat keyakinan rendah, silakan periksa kembali data di spreadsheet.' : ''}
+${transactionData.confidence === 'low' ? '⚠️ *Catatan:* Keyakinan rendah, periksa di spreadsheet.' : ''}
     `;
 
     await ctx.telegram.sendMessage(chatId, confirmationMessage, { parse_mode: 'Markdown' });
     console.log(`Successfully processed photo for chat ${chatId}`);
 
   } catch (error) {
-    console.error('Error in processPhotoSync:', error);
+    console.error('Error in processPhotoSyncOptimized:', error);
     
     // Cleanup status messages
     for (const msgId of statusMessages) {
       try {
         await ctx.telegram.deleteMessage(chatId, msgId);
       } catch (e) {
-        console.error('Error deleting status message:', e);
+        // Ignore cleanup errors
       }
     }
     
-    await ctx.telegram.sendMessage(
-      chatId, 
-      `❌ Terjadi kesalahan saat memproses foto: ${error.message}\n\n🔄 Silakan coba lagi dalam beberapa menit.`
-    );
+    let errorMsg = '❌ Terjadi kesalahan';
+    if (error.message.includes('timeout')) {
+      errorMsg += ' (timeout)';
+    }
+    errorMsg += '\n🔄 Silakan coba lagi dengan foto yang lebih kecil dan jelas.';
+    
+    await ctx.telegram.sendMessage(chatId, errorMsg);
+    
+  } finally {
+    // Cleanup
+    clearTimeout(globalTimeout);
+    processingSet.delete(processingKey);
   }
 }
 // Fungsi untuk menganalisis teks struk dengan AI
@@ -1499,13 +1557,20 @@ bot.on('photo', async (ctx) => {
   
   try {
     // Proses foto secara sinkron dengan update status real-time
-    await processPhotoSync(ctx, chatId, photo.file_id);
+    await processPhotoSyncOptimized(ctx, chatId, photo.file_id);
 
   } catch (error) {
     console.error('Error in photo handler:', error);
     await ctx.reply(`❌ Terjadi kesalahan: ${error.message}\n\n🔄 Silakan coba lagi.`);
   }
 });
+
+// Tambahkan periodic cleanup untuk processingSet
+setInterval(() => {
+  console.log(`Processing set size: ${processingSet.size}`);
+  // Set akan dibersihkan otomatis oleh timeout masing-masing proses
+}, 60000); // Check setiap menit
+
 // Handler untuk callback "Ya" (ganti folder)
 bot.action('replace_yes', async (ctx) => {
   try {
