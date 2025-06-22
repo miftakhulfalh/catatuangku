@@ -890,8 +890,10 @@ async function fallbackClassification(message, type, currentDate) {
     const lowerMessage = message.toLowerCase();
     
     if (type === 'keluar') {
-      if (lowerMessage.includes('makan') || lowerMessage.includes('minum') || lowerMessage.includes('nasi') || lowerMessage.includes('sate') || lowerMessage.includes('kopi')) {
-        category = 'Makanan & Minuman';
+      if (lowerMessage.includes('makan') || lowerMessage.includes('nasi') || lowerMessage.includes('sate') || lowerMessage.includes('jajan')) {
+        category = 'Makanan';
+      } else if (lowerMessage.includes('minum') || lowerMessage.includes('kopi') || lowerMessage.includes('es') || lowerMessage.includes('air mineral')) {
+        category = 'Minuman';
       } else if (lowerMessage.includes('bensin') || lowerMessage.includes('ojek') || lowerMessage.includes('taxi') || lowerMessage.includes('bus')) {
         category = 'Transportasi';
       } else if (lowerMessage.includes('motor') || lowerMessage.includes('mobil') || lowerMessage.includes('service')) {
