@@ -18,6 +18,10 @@
     {
       "src": "^/api/ai$",
       "dest": "/api/ai.js"
+    },
+    {
+      "src": "^/api/info$",
+      "dest": "/api/info.js"
     }
   ],
   "env": {
