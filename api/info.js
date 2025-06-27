@@ -9,7 +9,9 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 
 const NOTIFICATION_MESSAGE = `
 Terima kasih telah menggunakan bot @catatanuangkubot. Saat ini, ratusan pengguna telah terbantu dengan adanya bot ini untuk mencatat keuangannya. 
+
 Kami selalu berkomitmen agar bot ini sepenuhnya gratis, tanpa iklan dan mudah diakses. Untuk itu, mari kita bersama-sama untuk terus mengembangkan bot ini. 
+
 Kami terbuka untuk menerima feedback, masukan dan pertanyaan ke @catatanuangku_helper. Anda dapat memberikan masukan terkait penambahan fitur bot, perbaikan spreadsheet, atau masukan lain. 
 Sekali lagi, terima kasih telah menggunakan bot @catatanuangkubot 🙏
 
