@@ -1343,9 +1343,9 @@ bot.command('keluar', async (ctx) => {
       
       results.forEach((data, index) => {
         confirmationMessage += `*${index + 1}.* ${data.kategori}\n`;
-        confirmationMessage += `   💰 ${formatCurrency(data.jumlah)}\n`;
-        confirmationMessage += `   📝 ${data.keterangan}\n`;
-        confirmationMessage += `   📅 ${data.tanggal}\n\n`;
+        confirmationMessage += `   💰 Jumlah: ${formatCurrency(data.jumlah)}\n`;
+        confirmationMessage += `   📝 Keterangan: ${data.keterangan}\n`;
+        confirmationMessage += `   📅 Tanggal: ${data.tanggal}\n\n`;
       });
     }
 
@@ -1481,9 +1481,9 @@ bot.command('masuk', async (ctx) => {
       
       results.forEach((data, index) => {
         confirmationMessage += `*${index + 1}.* ${data.kategori}\n`;
-        confirmationMessage += `   💰 ${formatCurrency(data.jumlah)}\n`;
-        confirmationMessage += `   📝 ${data.keterangan}\n`;
-        confirmationMessage += `   📅 ${data.tanggal}\n\n`;
+        confirmationMessage += `   💰 Jumlah: ${formatCurrency(data.jumlah)}\n`;
+        confirmationMessage += `   📝 Keterangan: ${data.keterangan}\n`;
+        confirmationMessage += `   📅 Tanggal: ${data.tanggal}\n\n`;
       });
     }
 
