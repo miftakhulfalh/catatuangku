@@ -11,6 +11,7 @@ const NOTIFICATION_MESSAGE = `
 <b>📢 Update 2025-06-28: Multiple Transaction</b>
 
 Kini bot bisa memproses multiple transaction atau banyak pengeluaran/pendapatan dalam satu pesan.
+Anda dapat menggunakannya dg cara:
 
 1. Dengan separator "dan" 
 Contoh:
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
 
   try {
     const { data: users, error } = await supabase
-      .from('users_duplicate')
+      .from('users')
       .select('chat_id');
 
     if (error) throw error;
