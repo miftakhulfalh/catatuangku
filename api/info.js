@@ -8,7 +8,7 @@ const supabase = createClient(
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 const NOTIFICATION_MESSAGE = `
-<b>Update 2025-06-28: Multiple Transaction</b>
+<b>📢 Update 2025-06-28: Multiple Transaction</b>
 
 Kini bot bisa memproses multiple transaction atau banyak pengeluaran/pendapatan dalam satu pesan.
 
