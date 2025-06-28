@@ -8,12 +8,24 @@ const supabase = createClient(
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 const NOTIFICATION_MESSAGE = `
-Terima kasih telah menggunakan bot @catatanuangkubot. Saat ini, ratusan pengguna telah terbantu dengan adanya bot ini untuk mencatat keuangannya. 
+<b>Update 2025-06-28: Multiple Transaction</b>
 
-Kami selalu berkomitmen agar bot ini sepenuhnya gratis, tanpa iklan dan mudah diakses. Untuk itu, mari kita bersama-sama untuk terus mengembangkan bot ini. Share bot ini ke teman, saudara, dan kontak Anda. 
+Kini bot bisa memproses multiple transaction atau banyak pengeluaran/pendapatan dalam satu pesan.
+1. Dengan separator "dan" 
+Contoh:
+/keluar makan bakso 20rb dan parkir 2rb
 
-Kami terbuka untuk menerima feedback, masukan dan pertanyaan ke @catatanuangku_helper. Anda dapat memberikan masukan terkait penambahan fitur bot, perbaikan spreadsheet, atau masukan lain. 
-Sekali lagi, terima kasih telah menggunakan bot @catatanuangkubot 🙏
+2. Dengan separator koma (,)
+Contoh:
+/masuk gaji 2jt, uang saku 500rb
+
+3. Dengan separator new line (enter)
+Contoh:
+/keluar nonton bioskop 40rb
+makan 55rb
+parkir 7rb
+
+Note: cukup pakai 1 perintah /keluar untuk separator new line (enter)
 
 Klik /start jika menu tidak muncul. 
 `;
