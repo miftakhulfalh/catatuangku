@@ -659,7 +659,7 @@ Instruksi:
 5. Tentukan kategori berdasarkan jenis toko/bisnis atau item yang dibeli
 6. Buat keterangan singkat berdasarkan nama toko atau jenis pembelian
 
-Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Kesehatan, PDAM, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
+Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Kesehatan, PDAM, Pendidikan, Listrik, Kuota, Pulsa, Tagihan, Utilitas, Pengeluaran Lainnya
 
 Kategori Pendapatan: Gaji, Bonus, Freelance, Transfer, Hadiah, Investasi, Bisnis, Pendapatan Lainnya
 
@@ -770,7 +770,7 @@ Instruksi:
 3. Ekstrak keterangan/deskripsi
 4. Jika tidak ada tanggal dalam pesan, gunakan tanggal hari ini: ${currentDate}
 
-Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Kesehatan, PDAM, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
+Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Kesehatan, PDAM, Pulsa, Kuota, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
 
 Kategori Pendapatan: Gaji, Bonus, Freelance, Transfer, Hadiah, Investasi, Bisnis, Pendapatan Lainnya
 
