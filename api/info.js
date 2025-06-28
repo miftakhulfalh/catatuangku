@@ -28,6 +28,8 @@ parkir 7rb</blockquote>
 
 Note: cukup pakai 1 perintah /keluar untuk separator new line (enter)
 
+Ada saran pengembangan lain? Chat ke @catatanuangku_helper
+
 Klik /start jika menu tidak muncul. 
 `;
 
