@@ -11,19 +11,20 @@ const NOTIFICATION_MESSAGE = `
 <b>Update 2025-06-28: Multiple Transaction</b>
 
 Kini bot bisa memproses multiple transaction atau banyak pengeluaran/pendapatan dalam satu pesan.
+
 1. Dengan separator "dan" 
 Contoh:
-/keluar makan bakso 20rb dan parkir 2rb
+<blockquote>/keluar makan bakso 20rb dan parkir 2rb</blockquote>
 
 2. Dengan separator koma (,)
 Contoh:
-/masuk gaji 2jt, uang saku 500rb
+<blockquote>/masuk gaji 2jt, uang saku 500rb, freelance desain 100rb</blockquote>
 
 3. Dengan separator new line (enter)
 Contoh:
-/keluar nonton bioskop 40rb
+<blockquote>/keluar nonton bioskop 40rb
 makan 55rb
-parkir 7rb
+parkir 7rb</blockquote>
 
 Note: cukup pakai 1 perintah /keluar untuk separator new line (enter)
 
