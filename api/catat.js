@@ -737,53 +737,44 @@ Format output JSON:
   }
 }
 
-// Fungsi untuk mengklasifikasikan transaksi dengan AI Groq
-async function classifyTransaction(message, type) {
+// Fungsi untuk memisahkan multiple transaksi dari satu pesan
+function parseMultipleTransactions(message) {
+  // Split berdasarkan koma atau "dan" atau newline
+  const separators = /,|\band\b|\n/i;
+  const transactions = message.split(separators)
+    .map(t => t.trim())
+    .filter(t => t.length > 0);
+  
+  // Jika hanya ada satu transaksi atau tidak ada separator, return as is
+  if (transactions.length <= 1) {
+    return [message.trim()];
+  }
+  
+  return transactions;
+}
+
+// Modifikasi fungsi classifyTransaction untuk handle single transaction lebih sederhana
+async function classifySingleTransaction(message, type) {
   try {
-    const currentDate = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+    const currentDate = new Date().toISOString().split('T')[0];
     
     const prompt = `
-Analisis pesan transaksi berikut dan berikan output dalam format JSON yang tepat:
+Analisis transaksi berikut dan berikan output JSON:
 
-Pesan: "${message}"
+Transaksi: "${message}"
 Tipe: "${type === 'keluar' ? 'Pengeluaran' : 'Pendapatan'}"
 
 Instruksi:
-1. Ekstrak jumlah uang dari pesan (hapus kata seperti "rb", "ribu", "juta", dll dan konversi ke angka)
-   - "rb" atau "ribu" = x1000
-   - "jt" atau "juta" = x1000000
+1. Ekstrak jumlah uang (konversi rb=×1000, jt=×1000000)
 2. Tentukan kategori yang sesuai
 3. Ekstrak keterangan/deskripsi
 4. Jika tidak ada tanggal dalam pesan, gunakan tanggal hari ini: ${currentDate}
 
-Kategori untuk Pengeluaran:
-- Makanan
-- Minuman
-- Transportasi
-- Kendaraan
-- Belanja
-- Hiburan
-- Kesehatan
-- PDAM
-- Pendidikan
-- Listrik
-- Tagihan
-- Utilitas
-- Pengeluaran Lainnya
+Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Kesehatan, PDAM, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
 
-Kategori untuk Pendapatan:
-- Gaji
-- Bonus
-- Freelance
-- Transfer
-- Hadiah
-- Investasi
-- Bisnis
-- Pendapatan Lainnya
+Kategori Pendapatan: Gaji, Bonus, Freelance, Transfer, Hadiah, Investasi, Bisnis, Pendapatan Lainnya
 
-PENTING: Berikan HANYA output JSON yang valid, tanpa teks tambahan, komentar, atau penjelasan apapun.
-
-Format output JSON:
+Format JSON:
 {
   "klasifikasi": "${type === 'keluar' ? 'Pengeluaran' : 'Pendapatan'}",
   "kategori": "kategori_yang_sesuai",
@@ -797,7 +788,7 @@ Format output JSON:
       messages: [
         {
           role: "system",
-          content: "You are a financial transaction classifier. Return ONLY valid JSON without any additional text, comments, or explanations."
+          content: "You are a financial transaction classifier. Return ONLY valid JSON."
         },
         {
           role: "user",
@@ -810,9 +801,8 @@ Format output JSON:
     });
 
     let response = completion.choices[0]?.message?.content?.trim();
-    console.log('Groq AI Raw Response:', response);
-
-    // Clean response - remove any markdown code blocks or extra text
+    
+    // Clean response
     if (response.includes('```json')) {
       response = response.replace(/```json\n?/g, '').replace(/```\n?/g, '');
     }
@@ -820,29 +810,19 @@ Format output JSON:
       response = response.replace(/```/g, '');
     }
 
-    // Find JSON object in response
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       response = jsonMatch[0];
     }
 
-    console.log('Cleaned Response for parsing:', response);
-
-    // Try to parse JSON
     let parsed;
     try {
       parsed = JSON.parse(response);
     } catch (parseError) {
-      console.error('JSON Parse Error:', parseError);
-      console.error('Failed to parse response:', response);
-      
-      // Fallback: create manual classification
       return await fallbackClassification(message, type, currentDate);
     }
 
-    // Validate required fields
     if (!parsed.klasifikasi || !parsed.kategori || !parsed.jumlah || !parsed.keterangan || !parsed.tanggal) {
-      console.error('Missing required fields in parsed response:', parsed);
       return await fallbackClassification(message, type, currentDate);
     }
 
@@ -850,15 +830,68 @@ Format output JSON:
 
   } catch (error) {
     console.error('Error in AI classification:', error);
-    
-    // Fallback classification
+    const currentDate = new Date().toISOString().split('T')[0];
+    return await fallbackClassification(message, type, currentDate);
+  }
+}
+
+// Fungsi untuk memproses multiple transaksi
+async function processMultipleTransactions(transactions, type) {
+  const results = [];
+  const errors = [];
+
+  for (let i = 0; i < transactions.length; i++) {
+    const transaction = transactions[i];
+    console.log(`Processing transaction ${i + 1}: ${transaction}`);
+
     try {
-      const currentDate = new Date().toISOString().split('T')[0];
-      return await fallbackClassification(message, type, currentDate);
-    } catch (fallbackError) {
-      console.error('Fallback classification also failed:', fallbackError);
-      return { success: false, error: error.message };
+      const classification = await classifySingleTransaction(transaction, type);
+      if (classification.success) {
+        results.push(classification.data);
+      } else {
+        errors.push({ transaction, error: classification.error });
+      }
+    } catch (error) {
+      console.error(`Error processing transaction ${i + 1}:`, error);
+      errors.push({ transaction, error: error.message });
     }
+  }
+
+  return { results, errors };
+}
+
+// Fungsi untuk menulis multiple data ke spreadsheet
+async function writeMultipleToSpreadsheet(spreadsheetId, sheetName, dataArray) {
+  try {
+    if (!dataArray || dataArray.length === 0) {
+      return { success: false, error: 'No data to write' };
+    }
+
+    // Prepare values for batch insert
+    const values = dataArray.map(data => [
+      data.tanggal,
+      data.kategori,
+      data.jumlah,
+      data.keterangan
+    ]);
+
+    const resource = {
+      values: values
+    };
+
+    const result = await sheets.spreadsheets.values.append({
+      spreadsheetId: spreadsheetId,
+      range: `${sheetName}!A:D`,
+      valueInputOption: 'USER_ENTERED',
+      resource: resource
+    });
+
+    console.log(`${values.length} rows written to spreadsheet:`, result.data);
+    return { success: true, data: result.data, count: values.length };
+
+  } catch (error) {
+    console.error('Error writing multiple data to spreadsheet:', error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -1243,13 +1276,13 @@ Terima kasih telah menggunakan bot ini 🙏🙏🙏
   ctx.reply(message, { parse_mode: 'HTML' });
 });
 
-// Handler untuk perintah /keluar (pengeluaran)
+// Handler untuk perintah /keluar yang sudah dimodifikasi
 bot.command('keluar', async (ctx) => {
   const chatId = ctx.chat.id;
   const message = ctx.message.text.replace('/keluar', '').trim();
 
   if (!message) {
-    return ctx.reply('❌ Mohon sertakan detail pengeluaran. Contoh: /keluar makan sate 20rb');
+    return ctx.reply('❌ Mohon sertakan detail pengeluaran.\n\nContoh:\n• Satu pencatatan: /keluar makan sate 20rb\n• Multiple pencatatan: /keluar jajan 24rb, parkir 6rb, nonton 35rb');
   }
 
   try {
@@ -1266,21 +1299,23 @@ bot.command('keluar', async (ctx) => {
       return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
     }
 
-    // Kirim pesan proses dan simpan message id
-    const processingMessage = await ctx.reply('⏳ Sedang memproses pengeluaran...');
+    // Parse multiple transactions
+    const transactions = parseMultipleTransactions(message);
+    console.log('Detected transactions:', transactions);
 
-    // Klasifikasi dengan AI
-    const classification = await classifyTransaction(message, 'keluar');
-    if (!classification.success) {
-      console.error('Classification failed:', classification.error);
+    // Kirim pesan proses
+    const processingMessage = await ctx.reply(`⏳ Sedang memproses ${transactions.length} pengeluaran...`);
+
+    // Proses semua transaksi
+    const { results, errors } = await processMultipleTransactions(transactions, 'keluar');
+
+    if (results.length === 0) {
       await ctx.deleteMessage(processingMessage.message_id);
-      return ctx.reply('❌ Gagal menganalisis transaksi. Silakan coba lagi.');
+      return ctx.reply('❌ Gagal menganalisis semua transaksi. Silakan coba lagi dengan format yang lebih jelas.');
     }
 
-    const transactionData = classification.data;
-
     // Tulis ke spreadsheet
-    const writeResult = await writeToSpreadsheet(spreadsheetId, 'Pengeluaran', transactionData);
+    const writeResult = await writeMultipleToSpreadsheet(spreadsheetId, 'Pengeluaran', results);
     if (!writeResult.success) {
       console.error('Write to spreadsheet failed:', writeResult.error);
       await ctx.deleteMessage(processingMessage.message_id);
@@ -1290,17 +1325,60 @@ bot.command('keluar', async (ctx) => {
     // Hapus pesan "Sedang memproses"
     await ctx.deleteMessage(processingMessage.message_id);
 
-    // Kirim konfirmasi ke user
-    const confirmationMessage = `
-✅ *Berhasil mencatat Pengeluaran:*
+    // Buat pesan konfirmasi
+    let confirmationMessage = `✅ *Berhasil mencatat ${results.length} Pengeluaran:*\n\n`;
 
-📅 *Tanggal:* ${transactionData.tanggal}
-🏷️ *Kategori:* ${transactionData.kategori}
-💰 *Jumlah:* ${formatCurrency(transactionData.jumlah)}
-📝 *Keterangan:* ${transactionData.keterangan}
-    `;
+    results.forEach((data, index) => {
+      confirmationMessage += `*${index + 1}.* ${data.kategori}\n`;
+      confirmationMessage += `   💰 ${formatCurrency(data.jumlah)}\n`;
+      confirmationMessage += `   📝 ${data.keterangan}\n`;
+      confirmationMessage += `   📅 ${data.tanggal}\n\n`;
+    });
 
-    ctx.replyWithMarkdown(confirmationMessage);
+    // Tambahkan info error jika ada
+    if (errors.length > 0) {
+      confirmationMessage += `⚠️ *Gagal memproses ${errors.length} transaksi:*\n`;
+      errors.forEach((error, index) => {
+        confirmationMessage += `${index + 1}. ${error.transaction}\n`;
+      });
+    }
+
+    // Split pesan jika terlalu panjang (Telegram limit 4096 characters)
+    if (confirmationMessage.length > 4000) {
+      const chunks = [];
+      let currentChunk = `✅ *Berhasil mencatat ${results.length} Pengeluaran:*\n\n`;
+      
+      results.forEach((data, index) => {
+        const itemText = `*${index + 1}.* ${data.kategori}\n   💰 ${formatCurrency(data.jumlah)}\n   📝 ${data.keterangan}\n   📅 ${data.tanggal}\n\n`;
+        
+        if (currentChunk.length + itemText.length > 4000) {
+          chunks.push(currentChunk);
+          currentChunk = itemText;
+        } else {
+          currentChunk += itemText;
+        }
+      });
+      
+      if (currentChunk.trim()) {
+        chunks.push(currentChunk);
+      }
+
+      // Kirim chunks
+      for (const chunk of chunks) {
+        await ctx.replyWithMarkdown(chunk);
+      }
+
+      // Kirim error info jika ada
+      if (errors.length > 0) {
+        let errorMessage = `⚠️ *Gagal memproses ${errors.length} transaksi:*\n`;
+        errors.forEach((error, index) => {
+          errorMessage += `${index + 1}. ${error.transaction}\n`;
+        });
+        await ctx.replyWithMarkdown(errorMessage);
+      }
+    } else {
+      await ctx.replyWithMarkdown(confirmationMessage);
+    }
 
   } catch (error) {
     console.error('Error in /keluar handler:', error);
@@ -1308,13 +1386,13 @@ bot.command('keluar', async (ctx) => {
   }
 });
 
-// Handler untuk perintah /masuk (pendapatan)
+// Handler untuk perintah /masuk yang sudah dimodifikasi  
 bot.command('masuk', async (ctx) => {
   const chatId = ctx.chat.id;
   const message = ctx.message.text.replace('/masuk', '').trim();
 
   if (!message) {
-    return ctx.reply('❌ Mohon sertakan detail pendapatan. Contoh: /masuk gaji bulanan 5juta');
+    return ctx.reply('❌ Mohon sertakan detail pendapatan.\n\nContoh:\n• Satu pencatatan: /masuk gaji bulanan 5juta\n• Multiple pencatatan: /masuk gaji 5jt, bonus 1jt, freelance 500rb');
   }
 
   try {
@@ -1331,21 +1409,23 @@ bot.command('masuk', async (ctx) => {
       return ctx.reply('❌ Spreadsheet tidak ditemukan. Silakan setup ulang dengan mengirimkan link folder.');
     }
 
-    // Kirim pesan proses dan simpan message id
-    const processingMessage = await ctx.reply('⏳ Sedang memproses pendapatan...');
+    // Parse multiple transactions
+    const transactions = parseMultipleTransactions(message);
+    console.log('Detected transactions:', transactions);
 
-    // Klasifikasi dengan AI
-    const classification = await classifyTransaction(message, 'masuk');
-    if (!classification.success) {
-      console.error('Classification failed:', classification.error);
+    // Kirim pesan proses
+    const processingMessage = await ctx.reply(`⏳ Sedang memproses ${transactions.length} pendapatan...`);
+
+    // Proses semua transaksi
+    const { results, errors } = await processMultipleTransactions(transactions, 'masuk');
+
+    if (results.length === 0) {
       await ctx.deleteMessage(processingMessage.message_id);
-      return ctx.reply('❌ Gagal menganalisis transaksi. Silakan coba lagi.');
+      return ctx.reply('❌ Gagal menganalisis semua transaksi. Silakan coba lagi dengan format yang lebih jelas.');
     }
 
-    const transactionData = classification.data;
-
     // Tulis ke spreadsheet
-    const writeResult = await writeToSpreadsheet(spreadsheetId, 'Pendapatan', transactionData);
+    const writeResult = await writeMultipleToSpreadsheet(spreadsheetId, 'Pendapatan', results);
     if (!writeResult.success) {
       console.error('Write to spreadsheet failed:', writeResult.error);
       await ctx.deleteMessage(processingMessage.message_id);
@@ -1355,24 +1435,66 @@ bot.command('masuk', async (ctx) => {
     // Hapus pesan "Sedang memproses"
     await ctx.deleteMessage(processingMessage.message_id);
 
-    // Kirim konfirmasi ke user
-    const confirmationMessage = `
-✅ *Berhasil mencatat Pendapatan:*
+    // Buat pesan konfirmasi
+    let confirmationMessage = `✅ *Berhasil mencatat ${results.length} Pendapatan:*\n\n`;
 
-📅 *Tanggal:* ${transactionData.tanggal}
-🏷️ *Kategori:* ${transactionData.kategori}
-💰 *Jumlah:* ${formatCurrency(transactionData.jumlah)}
-📝 *Keterangan:* ${transactionData.keterangan}
-    `;
+    results.forEach((data, index) => {
+      confirmationMessage += `*${index + 1}.* ${data.kategori}\n`;
+      confirmationMessage += `   💰 ${formatCurrency(data.jumlah)}\n`;
+      confirmationMessage += `   📝 ${data.keterangan}\n`;
+      confirmationMessage += `   📅 ${data.tanggal}\n\n`;
+    });
 
-    ctx.replyWithMarkdown(confirmationMessage);
+    // Tambahkan info error jika ada
+    if (errors.length > 0) {
+      confirmationMessage += `⚠️ *Gagal memproses ${errors.length} transaksi:*\n`;
+      errors.forEach((error, index) => {
+        confirmationMessage += `${index + 1}. ${error.transaction}\n`;
+      });
+    }
+
+    // Split pesan jika terlalu panjang
+    if (confirmationMessage.length > 4000) {
+      const chunks = [];
+      let currentChunk = `✅ *Berhasil mencatat ${results.length} Pendapatan:*\n\n`;
+      
+      results.forEach((data, index) => {
+        const itemText = `*${index + 1}.* ${data.kategori}\n   💰 ${formatCurrency(data.jumlah)}\n   📝 ${data.keterangan}\n   📅 ${data.tanggal}\n\n`;
+        
+        if (currentChunk.length + itemText.length > 4000) {
+          chunks.push(currentChunk);
+          currentChunk = itemText;
+        } else {
+          currentChunk += itemText;
+        }
+      });
+      
+      if (currentChunk.trim()) {
+        chunks.push(currentChunk);
+      }
+
+      // Kirim chunks
+      for (const chunk of chunks) {
+        await ctx.replyWithMarkdown(chunk);
+      }
+
+      // Kirim error info jika ada
+      if (errors.length > 0) {
+        let errorMessage = `⚠️ *Gagal memproses ${errors.length} transaksi:*\n`;
+        errors.forEach((error, index) => {
+          errorMessage += `${index + 1}. ${error.transaction}\n`;
+        });
+        await ctx.replyWithMarkdown(errorMessage);
+      }
+    } else {
+      await ctx.replyWithMarkdown(confirmationMessage);
+    }
 
   } catch (error) {
     console.error('Error in /masuk handler:', error);
     ctx.reply('❌ Terjadi kesalahan saat mencatat pendapatan. Silakan coba lagi.');
   }
 });
-
 // Handler untuk perintah /rekap (rekap bulanan)
 bot.command('rekap', async (ctx) => {
   const chatId = ctx.chat.id;
