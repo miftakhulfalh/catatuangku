@@ -739,7 +739,16 @@ Format output JSON:
 
 // Fungsi untuk memisahkan multiple transaksi dari satu pesan
 function parseMultipleTransactions(message) {
-  // Split berdasarkan koma atau "dan" atau newline
+  // Cek apakah ada multiple nominal dalam satu kalimat
+  const amountPattern = /\d+(?:\.\d+)?\s*(rb|ribu|jt|juta|k|rupiah)?\b/gi;
+  const amounts = message.match(amountPattern);
+  
+  if (amounts && amounts.length > 1) {
+    // Jika ada multiple nominal, coba parse lebih detail
+    return parseComplexMultipleTransactions(message);
+  }
+  
+  // Split berdasarkan koma atau "dan" atau newline untuk kasus sederhana
   const separators = /,|\band\b|\n/i;
   const transactions = message.split(separators)
     .map(t => t.trim())
@@ -748,6 +757,37 @@ function parseMultipleTransactions(message) {
   // Jika hanya ada satu transaksi atau tidak ada separator, return as is
   if (transactions.length <= 1) {
     return [message.trim()];
+  }
+  
+  return transactions;
+}
+
+// Fungsi untuk parsing transaksi kompleks dengan multiple nominal
+function parseComplexMultipleTransactions(message) {
+  const transactions = [];
+  
+  // Pattern untuk mencari: kata/deskripsi + nominal
+  const transactionPattern = /([^0-9]+?)(\d+(?:\.\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?)\b/gi;
+  let match;
+  
+  while ((match = transactionPattern.exec(message)) !== null) {
+    const description = match[1].trim();
+    const amount = match[2].trim();
+    
+    // Skip jika deskripsi terlalu pendek atau hanya kata sambung
+    if (description.length > 1 && !['dan', 'atau', 'serta'].includes(description.toLowerCase())) {
+      transactions.push(`${description} ${amount}`);
+    }
+  }
+  
+  // Jika parsing gagal, fallback ke method sederhana
+  if (transactions.length === 0) {
+    const separators = /,|\band\b|\n/i;
+    const fallbackTransactions = message.split(separators)
+      .map(t => t.trim())
+      .filter(t => t.length > 0);
+    
+    return fallbackTransactions.length > 1 ? fallbackTransactions : [message.trim()];
   }
   
   return transactions;
