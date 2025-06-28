@@ -1326,14 +1326,28 @@ bot.command('keluar', async (ctx) => {
     await ctx.deleteMessage(processingMessage.message_id);
 
     // Buat pesan konfirmasi
-    let confirmationMessage = `✅ *Berhasil mencatat ${results.length} Pengeluaran:*\n\n`;
+    let confirmationMessage = '';
 
-    results.forEach((data, index) => {
-      confirmationMessage += `*${index + 1}.* ${data.kategori}\n`;
-      confirmationMessage += `   💰 ${formatCurrency(data.jumlah)}\n`;
-      confirmationMessage += `   📝 ${data.keterangan}\n`;
-      confirmationMessage += `   📅 ${data.tanggal}\n\n`;
-    });
+    if (results.length === 1) {
+      // Format untuk single transaction
+      const data = results[0];
+      confirmationMessage = `✅ *Berhasil mencatat Pengeluaran:*
+
+📅 *Tanggal:* ${data.tanggal}
+🏷️ *Kategori:* ${data.kategori}
+💰 *Jumlah:* ${formatCurrency(data.jumlah)}
+📝 *Keterangan:* ${data.keterangan}`;
+    } else {
+      // Format untuk multiple transactions
+      confirmationMessage = `✅ *Berhasil mencatat ${results.length} Pengeluaran:*\n\n`;
+      
+      results.forEach((data, index) => {
+        confirmationMessage += `*${index + 1}.* ${data.kategori}\n`;
+        confirmationMessage += `   💰 ${formatCurrency(data.jumlah)}\n`;
+        confirmationMessage += `   📝 ${data.keterangan}\n`;
+        confirmationMessage += `   📅 ${data.tanggal}\n\n`;
+      });
+    }
 
     // Tambahkan info error jika ada
     if (errors.length > 0) {
@@ -1377,7 +1391,21 @@ bot.command('keluar', async (ctx) => {
         await ctx.replyWithMarkdown(errorMessage);
       }
     } else {
-      await ctx.replyWithMarkdown(confirmationMessage);
+      // Untuk single transaction atau pesan yang tidak terlalu panjang
+      if (results.length === 1) {
+        await ctx.replyWithMarkdown(confirmationMessage);
+      } else {
+        await ctx.replyWithMarkdown(confirmationMessage);
+        
+        // Kirim error info jika ada
+        if (errors.length > 0) {
+          let errorMessage = `⚠️ *Gagal memproses ${errors.length} transaksi:*\n`;
+          errors.forEach((error, index) => {
+            errorMessage += `${index + 1}. ${error.transaction}\n`;
+          });
+          await ctx.replyWithMarkdown(errorMessage);
+        }
+      }
     }
 
   } catch (error) {
@@ -1436,14 +1464,28 @@ bot.command('masuk', async (ctx) => {
     await ctx.deleteMessage(processingMessage.message_id);
 
     // Buat pesan konfirmasi
-    let confirmationMessage = `✅ *Berhasil mencatat ${results.length} Pendapatan:*\n\n`;
+    let confirmationMessage = '';
 
-    results.forEach((data, index) => {
-      confirmationMessage += `*${index + 1}.* ${data.kategori}\n`;
-      confirmationMessage += `   💰 ${formatCurrency(data.jumlah)}\n`;
-      confirmationMessage += `   📝 ${data.keterangan}\n`;
-      confirmationMessage += `   📅 ${data.tanggal}\n\n`;
-    });
+    if (results.length === 1) {
+      // Format untuk single transaction
+      const data = results[0];
+      confirmationMessage = `✅ *Berhasil mencatat Pendapatan:*
+
+📅 *Tanggal:* ${data.tanggal}
+🏷️ *Kategori:* ${data.kategori}
+💰 *Jumlah:* ${formatCurrency(data.jumlah)}
+📝 *Keterangan:* ${data.keterangan}`;
+    } else {
+      // Format untuk multiple transactions
+      confirmationMessage = `✅ *Berhasil mencatat ${results.length} Pendapatan:*\n\n`;
+      
+      results.forEach((data, index) => {
+        confirmationMessage += `*${index + 1}.* ${data.kategori}\n`;
+        confirmationMessage += `   💰 ${formatCurrency(data.jumlah)}\n`;
+        confirmationMessage += `   📝 ${data.keterangan}\n`;
+        confirmationMessage += `   📅 ${data.tanggal}\n\n`;
+      });
+    }
 
     // Tambahkan info error jika ada
     if (errors.length > 0) {
@@ -1487,7 +1529,21 @@ bot.command('masuk', async (ctx) => {
         await ctx.replyWithMarkdown(errorMessage);
       }
     } else {
-      await ctx.replyWithMarkdown(confirmationMessage);
+      // Untuk single transaction atau pesan yang tidak terlalu panjang
+      if (results.length === 1) {
+        await ctx.replyWithMarkdown(confirmationMessage);
+      } else {
+        await ctx.replyWithMarkdown(confirmationMessage);
+        
+        // Kirim error info jika ada
+        if (errors.length > 0) {
+          let errorMessage = `⚠️ *Gagal memproses ${errors.length} transaksi:*\n`;
+          errors.forEach((error, index) => {
+            errorMessage += `${index + 1}. ${error.transaction}\n`;
+          });
+          await ctx.replyWithMarkdown(errorMessage);
+        }
+      }
     }
 
   } catch (error) {
