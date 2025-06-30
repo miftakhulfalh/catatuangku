@@ -773,8 +773,8 @@ function parseComplexMultipleTransactions(message) {
     // Clean up string
     let cleaned = amountStr.replace(/[^\d\s.,jtrbiukpah]/gi, '');
     
-    // Handle kombinasi seperti "1jt 2rb", "500rb 50k", etc
-    const combinedPattern = /(\d+(?:[.,]\d+)?)\s*(jt|juta)\s*(\d+(?:[.,]\d+)?)\s*(rb|ribu|k)/gi;
+    // Handle kombinasi seperti "1jt 2rb", "1 juta 2rb", etc
+    const combinedPattern = /(\d+(?:[.,]\d+)?)\s*(jt|juta)\s+(\d+(?:[.,]\d+)?)\s*(rb|ribu|k)/gi;
     const combinedMatch = combinedPattern.exec(cleaned);
     
     if (combinedMatch) {
@@ -818,7 +818,7 @@ function parseComplexMultipleTransactions(message) {
   }
   
   // Updated pattern yang lebih komprehensif untuk menangani kombinasi amount
-  const transactionPattern = /(?:(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s*\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?)\s*([^\d\n]+?)(?=\d|$))|(?:([^\d\n]+?)\s*(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s*\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?))/gi;
+  const transactionPattern = /(?:(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s+\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?)\s*([^\d\n]+?)(?=\d|$))|(?:([^\d\n]+?)\s*(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s+\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?))/gi;
   
   let match;
   
@@ -845,7 +845,7 @@ function parseComplexMultipleTransactions(message) {
       .filter(t => t.length > 0)
       .map(t => {
         // Apply normalization to fallback transactions too
-        const amountMatch = t.match(/(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s*\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?)/i);
+        const amountMatch = t.match(/(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s+\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?)/i);
         if (amountMatch) {
           const normalizedAmount = normalizeAmount(amountMatch[0]);
           return t.replace(amountMatch[0], normalizedAmount);
