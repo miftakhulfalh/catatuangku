@@ -766,32 +766,36 @@ function parseMultipleTransactions(message) {
 function parseComplexMultipleTransactions(message) {
   const transactions = [];
   
-  // Pattern untuk mencari: kata/deskripsi + nominal
-  const transactionPattern = /([^0-9]+?)(\d+(?:\.\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?)\b/gi;
+  const transactionPattern = /(?:(\d[\d., ]*(?:rb|ribu|jt|juta|k|rupiah)?)\s*([^\d\n]+))|(?:([^\d\n]+?)\s*(\d[\d., ]*(?:rb|ribu|jt|juta|k|rupiah)?))/gi;
   let match;
   
   while ((match = transactionPattern.exec(message)) !== null) {
-    const description = match[1].trim();
-    const amount = match[2].trim();
+    const jumlah1 = match[1]?.trim();
+    const ket1 = match[2]?.trim();
+    const ket2 = match[3]?.trim();
+    const jumlah2 = match[4]?.trim();
     
-    // Skip jika deskripsi terlalu pendek atau hanya kata sambung
-    if (description.length > 1 && !['dan', 'atau', 'serta'].includes(description.toLowerCase())) {
+    const amount = jumlah1 || jumlah2;
+    const description = ket1 || ket2;
+    
+    if (amount && description && description.length > 1 && !['dan', 'atau', 'serta'].includes(description.toLowerCase())) {
       transactions.push(`${description} ${amount}`);
     }
   }
-  
-  // Jika parsing gagal, fallback ke method sederhana
+
+  // fallback jika tidak ada yang cocok
   if (transactions.length === 0) {
     const separators = /,|\band\b|\n/i;
     const fallbackTransactions = message.split(separators)
       .map(t => t.trim())
       .filter(t => t.length > 0);
-    
+
     return fallbackTransactions.length > 1 ? fallbackTransactions : [message.trim()];
   }
-  
+
   return transactions;
 }
+
 
 // Modifikasi fungsi classifyTransaction untuk handle single transaction lebih sederhana
 async function classifySingleTransaction(message, type) {
