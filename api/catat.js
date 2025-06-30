@@ -771,49 +771,40 @@ function parseMultipleTransactions(message) {
 function parseComplexMultipleTransactions(message) {
   const transactions = [];
   
-  // Helper function untuk normalize amount dengan dukungan kombinasi seperti "1juta 2ribu"
+  // Helper function untuk normalize amount dengan dukungan kombinasi seperti "1jt 2rb"
   function normalizeAmount(amountStr) {
     if (!amountStr) return null;
     
-    // Clean up string tapi pertahankan titik dan koma
-    let cleaned = amountStr.trim();
+    // Clean up string
+    let cleaned = amountStr.replace(/[^\d\s.,jtrbiukpah]/gi, '');
     
-    // Handle kombinasi seperti "1juta 2ribu", "1jt 2rb", "1 juta 2 ribu"
-    const combinedPattern = /(\d+(?:[.,]\d+)?)\s*(?:jt|juta)\s+(\d+(?:[.,]\d+)?)\s*(?:rb|ribu|k)/i;
-    const combinedMatch = cleaned.match(combinedPattern);
+    // Handle kombinasi seperti "1jt 2rb", "1 juta 2rb", etc
+    const combinedPattern = /(\d+(?:[.,]\d+)?)\s*(jt|juta)\s+(\d+(?:[.,]\d+)?)\s*(rb|ribu|k)/gi;
+    const combinedMatch = combinedPattern.exec(cleaned);
     
     if (combinedMatch) {
-      const [, jutaNum, ribuNum] = combinedMatch;
+      const [, jutaNum, jutaUnit, ribuNum, ribuUnit] = combinedMatch;
       const jutaValue = parseFloat(jutaNum.replace(',', '.')) * 1000000;
-      const ribuValue = parseFloat(ribuNum.replace(',', '.')) * 1000;
+      let ribuValue = parseFloat(ribuNum.replace(',', '.'));
+      
+      // Convert ribu/rb/k to actual value
+      if (ribuUnit.toLowerCase().includes('rb') || ribuUnit.toLowerCase().includes('ribu')) {
+        ribuValue *= 1000;
+      } else if (ribuUnit.toLowerCase() === 'k') {
+        ribuValue *= 1000;
+      }
+      
       return Math.round(jutaValue + ribuValue).toString();
     }
     
-    // Handle single amounts dengan titik sebagai pemisah ribuan
-    const singlePattern = /(\d+(?:[.,]\d+)?)\s*(?:jt|juta|rb|ribu|k|rupiah)?/i;
-    const singleMatch = cleaned.match(singlePattern);
+    // Handle single amounts
+    const singlePattern = /(\d+(?:[.,]\d+)?)\s*(jt|juta|rb|ribu|k|rupiah)?/i;
+    const singleMatch = singlePattern.exec(cleaned);
     
     if (singleMatch) {
-      const [fullMatch, num, unit] = singleMatch;
-      let value;
+      const [, num, unit] = singleMatch;
+      let value = parseFloat(num.replace(',', '.'));
       
-      // Handle angka dengan titik sebagai pemisah ribuan (13.000) vs desimal (13,5)
-      if (num.includes('.') && !num.includes(',')) {
-        // Jika hanya ada titik, anggap sebagai pemisah ribuan jika ada 3 digit setelah titik
-        const parts = num.split('.');
-        if (parts.length === 2 && parts[1].length === 3) {
-          // 13.000 -> 13000
-          value = parseInt(parts[0] + parts[1]);
-        } else {
-          // Titik sebagai desimal
-          value = parseFloat(num);
-        }
-      } else {
-        // Handle koma sebagai desimal atau campuran
-        value = parseFloat(num.replace(',', '.'));
-      }
-      
-      // Apply unit multiplier
       if (unit) {
         const unitLower = unit.toLowerCase();
         if (unitLower.includes('jt') || unitLower.includes('juta')) {
@@ -831,31 +822,46 @@ function parseComplexMultipleTransactions(message) {
     return amountStr;
   }
   
-  // Split by separators first
-  const separators = /,|\band\b|\n/i;
-  const parts = message.split(separators).map(p => p.trim()).filter(p => p.length > 0);
+  // Updated pattern yang lebih komprehensif untuk menangani kombinasi amount
+  const transactionPattern = /(?:(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s+\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?)\s*([^\d\n]+?)(?=\d|$))|(?:([^\d\n]+?)\s*(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s+\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?))/gi;
   
-  for (const part of parts) {
-    // Pattern untuk menangkap amount dan description dalam setiap part
-    const transactionPattern = /(?:(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s+\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?)\s*(.+))|(?:(.+?)\s*(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s+\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?))/i;
+  let match;
+  
+  while ((match = transactionPattern.exec(message)) !== null) {
+    const jumlah1 = match[1]?.trim();
+    const ket1 = match[2]?.trim();
+    const ket2 = match[3]?.trim();
+    const jumlah2 = match[4]?.trim();
     
-    const match = part.match(transactionPattern);
+    const rawAmount = jumlah1 || jumlah2;
+    const description = ket1 || ket2;
     
-    if (match) {
-      const rawAmount = match[1] || match[4];
-      const description = (match[2] || match[3])?.trim();
-      
-      if (rawAmount && description && description.length > 1) {
-        const normalizedAmount = normalizeAmount(rawAmount);
-        transactions.push(`${description} ${normalizedAmount}`);
-      }
-    } else {
-      // Fallback: jika tidak match pattern, masukkan apa adanya
-      transactions.push(part);
+    if (rawAmount && description && description.length > 1 && !['dan', 'atau', 'serta'].includes(description.toLowerCase())) {
+      const normalizedAmount = normalizeAmount(rawAmount);
+      transactions.push(`${description} ${normalizedAmount}`);
     }
   }
   
-  return transactions.length > 0 ? transactions : [message.trim()];
+  // Fallback jika tidak ada yang cocok
+  if (transactions.length === 0) {
+    const separators = /,|\band\b|\n/i;
+    const fallbackTransactions = message.split(separators)
+      .map(t => t.trim())
+      .filter(t => t.length > 0)
+      .map(t => {
+        // Apply normalization to fallback transactions too
+        const amountMatch = t.match(/(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s+\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?)/i);
+        if (amountMatch) {
+          const normalizedAmount = normalizeAmount(amountMatch[0]);
+          return t.replace(amountMatch[0], normalizedAmount);
+        }
+        return t;
+      });
+    
+    return fallbackTransactions.length > 1 ? fallbackTransactions : [message.trim()];
+  }
+  
+  return transactions;
 }
 
 // Modifikasi fungsi classifyTransaction untuk handle single transaction lebih sederhana
