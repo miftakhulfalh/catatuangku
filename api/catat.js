@@ -766,7 +766,60 @@ function parseMultipleTransactions(message) {
 function parseComplexMultipleTransactions(message) {
   const transactions = [];
   
-  const transactionPattern = /(?:(\d[\d., ]*(?:rb|ribu|jt|juta|k|rupiah)?)\s*([^\d\n]+))|(?:([^\d\n]+?)\s*(\d[\d., ]*(?:rb|ribu|jt|juta|k|rupiah)?))/gi;
+  // Helper function untuk normalize amount dengan dukungan kombinasi seperti "1jt 2rb"
+  function normalizeAmount(amountStr) {
+    if (!amountStr) return null;
+    
+    // Clean up string
+    let cleaned = amountStr.replace(/[^\d\s.,jtrbiukpah]/gi, '');
+    
+    // Handle kombinasi seperti "1jt 2rb", "500rb 50k", etc
+    const combinedPattern = /(\d+(?:[.,]\d+)?)\s*(jt|juta)\s*(\d+(?:[.,]\d+)?)\s*(rb|ribu|k)/gi;
+    const combinedMatch = combinedPattern.exec(cleaned);
+    
+    if (combinedMatch) {
+      const [, jutaNum, jutaUnit, ribuNum, ribuUnit] = combinedMatch;
+      const jutaValue = parseFloat(jutaNum.replace(',', '.')) * 1000000;
+      let ribuValue = parseFloat(ribuNum.replace(',', '.'));
+      
+      // Convert ribu/rb/k to actual value
+      if (ribuUnit.toLowerCase().includes('rb') || ribuUnit.toLowerCase().includes('ribu')) {
+        ribuValue *= 1000;
+      } else if (ribuUnit.toLowerCase() === 'k') {
+        ribuValue *= 1000;
+      }
+      
+      return Math.round(jutaValue + ribuValue).toString();
+    }
+    
+    // Handle single amounts
+    const singlePattern = /(\d+(?:[.,]\d+)?)\s*(jt|juta|rb|ribu|k|rupiah)?/i;
+    const singleMatch = singlePattern.exec(cleaned);
+    
+    if (singleMatch) {
+      const [, num, unit] = singleMatch;
+      let value = parseFloat(num.replace(',', '.'));
+      
+      if (unit) {
+        const unitLower = unit.toLowerCase();
+        if (unitLower.includes('jt') || unitLower.includes('juta')) {
+          value *= 1000000;
+        } else if (unitLower.includes('rb') || unitLower.includes('ribu')) {
+          value *= 1000;
+        } else if (unitLower === 'k') {
+          value *= 1000;
+        }
+      }
+      
+      return Math.round(value).toString();
+    }
+    
+    return amountStr;
+  }
+  
+  // Updated pattern yang lebih komprehensif untuk menangani kombinasi amount
+  const transactionPattern = /(?:(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s*\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?)\s*([^\d\n]+?)(?=\d|$))|(?:([^\d\n]+?)\s*(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s*\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?))/gi;
+  
   let match;
   
   while ((match = transactionPattern.exec(message)) !== null) {
@@ -775,27 +828,36 @@ function parseComplexMultipleTransactions(message) {
     const ket2 = match[3]?.trim();
     const jumlah2 = match[4]?.trim();
     
-    const amount = jumlah1 || jumlah2;
+    const rawAmount = jumlah1 || jumlah2;
     const description = ket1 || ket2;
     
-    if (amount && description && description.length > 1 && !['dan', 'atau', 'serta'].includes(description.toLowerCase())) {
-      transactions.push(`${description} ${amount}`);
+    if (rawAmount && description && description.length > 1 && !['dan', 'atau', 'serta'].includes(description.toLowerCase())) {
+      const normalizedAmount = normalizeAmount(rawAmount);
+      transactions.push(`${description} ${normalizedAmount}`);
     }
   }
-
-  // fallback jika tidak ada yang cocok
+  
+  // Fallback jika tidak ada yang cocok
   if (transactions.length === 0) {
     const separators = /,|\band\b|\n/i;
     const fallbackTransactions = message.split(separators)
       .map(t => t.trim())
-      .filter(t => t.length > 0);
-
+      .filter(t => t.length > 0)
+      .map(t => {
+        // Apply normalization to fallback transactions too
+        const amountMatch = t.match(/(\d+(?:[.,]\d+)?\s*(?:jt|juta)\s*\d+(?:[.,]\d+)?\s*(?:rb|ribu|k)|\d+(?:[.,]\d+)?\s*(?:rb|ribu|jt|juta|k|rupiah)?)/i);
+        if (amountMatch) {
+          const normalizedAmount = normalizeAmount(amountMatch[0]);
+          return t.replace(amountMatch[0], normalizedAmount);
+        }
+        return t;
+      });
+    
     return fallbackTransactions.length > 1 ? fallbackTransactions : [message.trim()];
   }
-
+  
   return transactions;
 }
-
 
 // Modifikasi fungsi classifyTransaction untuk handle single transaction lebih sederhana
 async function classifySingleTransaction(message, type) {
