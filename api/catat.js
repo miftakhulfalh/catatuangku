@@ -739,50 +739,65 @@ Format output JSON:
 
 // Fungsi untuk memisahkan multiple transaksi dari satu pesan
 function parseMultipleTransactions(message) {
-  // Split berdasarkan separator utama (koma)
-  const separators = /,(?!\d)/g; // Koma yang tidak diikuti langsung angka
-  const parts = message.split(separators)
+  console.log('Input message:', message);
+  
+  // Split berdasarkan koma sebagai separator utama
+  const parts = message.split(',')
     .map(t => t.trim())
     .filter(t => t.length > 0);
   
+  console.log('Split parts:', parts);
+  
   if (parts.length > 1) {
     // Multiple transactions detected
-    return parts.map(part => normalizeTransactionAmount(part));
+    const normalized = parts.map(part => normalizeTransactionAmount(part));
+    console.log('Normalized transactions:', normalized);
+    return normalized;
   }
   
   // Single transaction
-  return [normalizeTransactionAmount(message.trim())];
+  const single = normalizeTransactionAmount(message.trim());
+  console.log('Single transaction normalized:', single);
+  return [single];
 }
 
-// Helper function untuk normalize amount dengan dukungan kombinasi seperti "1jt 2rb"
+// Helper function untuk normalize amount dengan dukungan kombinasi seperti "1juta 2ribu"
 function normalizeAmount(amountStr) {
   if (!amountStr) return null;
   
-  console.log('Input amount string:', amountStr);
+  console.log('=== normalizeAmount input:', `"${amountStr}"`);
   
-  // Clean up string - hapus karakter yang tidak perlu
   let cleaned = amountStr.trim();
   
-  // Handle kombinasi seperti "1juta 2ribu", "1 juta 2ribu", etc
-  const combinedPattern = /(\d+(?:[.,]\d+)?)\s*(?:jt|juta)\s+(\d+(?:[.,]\d+)?)\s*(?:rb|ribu|k)/gi;
-  const combinedMatch = combinedPattern.exec(cleaned);
+  // PRIORITAS 1: Handle kombinasi seperti "1juta 2ribu", "1 juta 2ribu", "1jt 500rb"
+  const combinedPattern = /(\d+(?:[.,]\d+)?)\s*(?:jt|juta)\s+(\d+(?:[.,]\d+)?)\s*(?:rb|ribu|k)/i;
+  const combinedMatch = cleaned.match(combinedPattern);
   
   if (combinedMatch) {
-    console.log('Combined pattern match:', combinedMatch);
-    const [, jutaNum, ribuNum] = combinedMatch;
+    console.log('Combined pattern matched:', combinedMatch);
+    const [fullMatch, jutaNum, ribuNum] = combinedMatch;
     const jutaValue = parseFloat(jutaNum.replace(',', '.')) * 1000000;
     const ribuValue = parseFloat(ribuNum.replace(',', '.')) * 1000;
     const totalValue = Math.round(jutaValue + ribuValue);
-    console.log(`Combined: ${jutaNum} juta + ${ribuNum} ribu = ${totalValue}`);
+    console.log(`Combined calculation: ${jutaNum} juta (${jutaValue}) + ${ribuNum} ribu (${ribuValue}) = ${totalValue}`);
     return totalValue.toString();
   }
   
-  // Handle single amounts dengan format yang lebih ketat
-  const singlePattern = /(\d+(?:[.,]\d+)?)\s*(jt|juta|rb|ribu|k|rupiah)?/i;
-  const singleMatch = singlePattern.exec(cleaned);
+  // PRIORITAS 2: Handle angka dengan pemisah ribuan: 13.000, 1.500.000
+  const thousandSeparatorPattern = /^\d{1,3}(?:[.,]\d{3})+$/;
+  if (thousandSeparatorPattern.test(cleaned)) {
+    console.log('Thousand separator detected:', cleaned);
+    const value = parseInt(cleaned.replace(/[.,]/g, ''));
+    console.log('Thousand separator value:', value);
+    return value.toString();
+  }
+  
+  // PRIORITAS 3: Handle single amounts dengan unit
+  const singleUnitPattern = /(\d+(?:[.,]\d+)?)\s*(jt|juta|rb|ribu|k|rupiah)?$/i;
+  const singleMatch = cleaned.match(singleUnitPattern);
   
   if (singleMatch) {
-    console.log('Single pattern match:', singleMatch);
+    console.log('Single unit pattern matched:', singleMatch);
     const [, num, unit] = singleMatch;
     let value = parseFloat(num.replace(',', '.'));
     
@@ -795,11 +810,10 @@ function normalizeAmount(amountStr) {
       } else if (unitLower === 'k') {
         value *= 1000;
       }
-      // rupiah tidak dikalikan (sudah dalam satuan rupiah)
     }
     
     const finalValue = Math.round(value);
-    console.log(`Single: ${num} ${unit || ''} = ${finalValue}`);
+    console.log(`Single unit calculation: ${num} ${unit || 'no unit'} = ${finalValue}`);
     return finalValue.toString();
   }
   
@@ -811,42 +825,62 @@ function normalizeAmount(amountStr) {
 function normalizeTransactionAmount(transaction) {
   if (!transaction) return transaction;
   
-  console.log('Processing transaction:', transaction);
+  console.log('--- Processing transaction:', `"${transaction}"`);
   
-  // Pattern untuk mendeteksi amount dalam berbagai format
-  const amountPatterns = [
-    // Kombinasi juta ribu: 1juta 2ribu, 1 juta 2 ribu, etc
-    /(\d+(?:[.,]\d+)?)\s*(?:jt|juta)\s+(\d+(?:[.,]\d+)?)\s*(?:rb|ribu|k)/gi,
-    // Single dengan unit: 10rb, 15ribu, 1juta, etc
-    /(\d+(?:[.,]\d+)?)\s*(?:jt|juta|rb|ribu|k|rupiah)/gi,
-    // Angka dengan titik/koma sebagai pemisah ribuan: 13.000, 28,000
-    /\d+[.,]\d{3}(?:[.,]\d{3})*/g,
-    // Angka biasa tanpa unit: 28000
-    /\d+/g
-  ];
+  // STEP 1: Cari kombinasi juta+ribu terlebih dahulu (prioritas tertinggi)
+  const combinedPattern = /(\d+(?:[.,]\d+)?)\s*(?:jt|juta)\s+(\d+(?:[.,]\d+)?)\s*(?:rb|ribu|k)/i;
+  const combinedMatch = transaction.match(combinedPattern);
   
-  let foundAmount = null;
-  let originalAmount = null;
-  
-  // Coba setiap pattern sampai menemukan yang cocok
-  for (const pattern of amountPatterns) {
-    const matches = transaction.match(pattern);
-    if (matches && matches.length > 0) {
-      // Ambil match terakhir (biasanya yang paling relevan)
-      originalAmount = matches[matches.length - 1];
-      foundAmount = normalizeAmount(originalAmount);
-      break;
-    }
-  }
-  
-  if (foundAmount && originalAmount) {
-    console.log(`Replacing '${originalAmount}' with '${foundAmount}' in '${transaction}'`);
-    const result = transaction.replace(originalAmount, foundAmount);
-    console.log('Result:', result);
+  if (combinedMatch) {
+    console.log('Found combined amount:', combinedMatch[0]);
+    const normalizedAmount = normalizeAmount(combinedMatch[0]);
+    const result = transaction.replace(combinedMatch[0], normalizedAmount);
+    console.log(`Replaced combined: "${combinedMatch[0]}" -> "${normalizedAmount}"`);
+    console.log('Final result:', result);
     return result;
   }
   
-  console.log('No amount found, returning original transaction');
+  // STEP 2: Cari angka dengan pemisah ribuan (13.000, 28.000)
+  const thousandPattern = /\d{1,3}(?:[.,]\d{3})+/g;
+  const thousandMatches = transaction.match(thousandPattern);
+  
+  if (thousandMatches) {
+    console.log('Found thousand separator amounts:', thousandMatches);
+    let result = transaction;
+    thousandMatches.forEach(match => {
+      const normalizedAmount = normalizeAmount(match);
+      result = result.replace(match, normalizedAmount);
+      console.log(`Replaced thousand: "${match}" -> "${normalizedAmount}"`);
+    });
+    console.log('Final result:', result);
+    return result;
+  }
+  
+  // STEP 3: Cari single amount dengan unit (10rb, 5juta, dll)
+  const singleUnitPattern = /(\d+(?:[.,]\d+)?)\s*(?:jt|juta|rb|ribu|k|rupiah)/i;
+  const singleMatch = transaction.match(singleUnitPattern);
+  
+  if (singleMatch) {
+    console.log('Found single unit amount:', singleMatch[0]);
+    const normalizedAmount = normalizeAmount(singleMatch[0]);
+    const result = transaction.replace(singleMatch[0], normalizedAmount);
+    console.log(`Replaced single unit: "${singleMatch[0]}" -> "${normalizedAmount}"`);
+    console.log('Final result:', result);
+    return result;
+  }
+  
+  // STEP 4: Cari angka biasa tanpa unit (28000)
+  const plainNumberPattern = /\b\d+\b/;
+  const plainMatch = transaction.match(plainNumberPattern);
+  
+  if (plainMatch) {
+    console.log('Found plain number:', plainMatch[0]);
+    // Untuk angka biasa, tidak perlu normalisasi
+    console.log('Final result (no change):', transaction);
+    return transaction;
+  }
+  
+  console.log('No amount found, returning original');
   return transaction;
 }
 
