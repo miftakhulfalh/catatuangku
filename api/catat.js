@@ -890,7 +890,7 @@ async function classifySingleTransaction(message, type) {
   try {
     const currentDate = new Date().toISOString().split('T')[0];
     
-    // 🔥 SOLUSI 1: Pre-extract amount sebelum dikirim ke AI
+    // Pre-extract amount sebelum dikirim ke AI
     const extractedAmount = extractAmountFromMessage(message);
     console.log('Pre-extracted amount:', extractedAmount);
     
@@ -921,7 +921,7 @@ Format JSON (gunakan jumlah ${extractedAmount}):
   "klasifikasi": "${type === 'keluar' ? 'Pengeluaran' : 'Pendapatan'}",
   "kategori": "kategori_yang_sesuai",
   "jumlah": ${extractedAmount},
-  "keterangan": "deskripsi_tanpa_angka",
+  "keterangan": "deskripsi_singkat",
   "tanggal": "${currentDate}"
 }`;
     } else {
@@ -991,7 +991,7 @@ Format JSON:
       return await fallbackClassification(message, type, currentDate);
     }
 
-    // 🔥 SOLUSI 2: Double-check dan paksakan amount yang benar
+    // Double-check dan paksakan amount yang benar
     if (extractedAmount !== null && parsed.jumlah !== extractedAmount) {
       console.warn(`AI returned wrong amount: ${parsed.jumlah}, forcing to: ${extractedAmount}`);
       parsed.jumlah = extractedAmount;
@@ -1003,7 +1003,7 @@ Format JSON:
       return await fallbackClassification(message, type, currentDate);
     }
 
-    // 🔥 SOLUSI 3: Ensure jumlah is number
+    // Ensure jumlah is number
     parsed.jumlah = parseInt(parsed.jumlah) || 0;
 
     console.log('Final classification result:', parsed);
@@ -1016,7 +1016,7 @@ Format JSON:
   }
 }
 
-// 🔥 FUNGSI BARU: Extract amount dari pesan yang sudah dinormalisasi
+// Extract amount dari pesan yang sudah dinormalisasi
 function extractAmountFromMessage(message) {
   console.log('Extracting amount from:', message);
   
