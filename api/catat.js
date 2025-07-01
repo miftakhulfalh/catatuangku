@@ -741,8 +741,9 @@ Format output JSON:
 function parseMultipleTransactions(message) {
   console.log('Input message:', message);
   
-  // Split berdasarkan koma sebagai separator utama
-  const parts = message.split(',')
+  // Split berdasarkan multiple separators: koma, kata "dan", dan newline
+  const separatorPattern = /,|\s+dan\s+|\n/i;
+  const parts = message.split(separatorPattern)
     .map(t => t.trim())
     .filter(t => t.length > 0);
   
