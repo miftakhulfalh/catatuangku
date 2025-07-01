@@ -890,7 +890,43 @@ async function classifySingleTransaction(message, type) {
   try {
     const currentDate = new Date().toISOString().split('T')[0];
     
-    const prompt = `
+    // 🔥 SOLUSI 1: Pre-extract amount sebelum dikirim ke AI
+    const extractedAmount = extractAmountFromMessage(message);
+    console.log('Pre-extracted amount:', extractedAmount);
+    
+    // Jika berhasil extract amount, beri tahu AI secara eksplisit
+    let enhancedPrompt;
+    if (extractedAmount !== null) {
+      enhancedPrompt = `
+Analisis transaksi berikut dan berikan output JSON:
+
+Transaksi: "${message}"
+Tipe: "${type === 'keluar' ? 'Pengeluaran' : 'Pendapatan'}"
+JUMLAH YANG SUDAH DIKONVERSI: ${extractedAmount}
+
+PENTING: Gunakan jumlah ${extractedAmount} yang sudah saya berikan. JANGAN parse ulang angka dari pesan.
+
+Instruksi:
+1. WAJIB gunakan jumlah: ${extractedAmount}
+2. Tentukan kategori yang sesuai
+3. Ekstrak keterangan/deskripsi (hapus angka dari keterangan)
+4. Jika tidak ada tanggal dalam pesan, gunakan tanggal hari ini: ${currentDate}
+
+Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Kesehatan, PDAM, Pulsa, Kuota, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
+
+Kategori Pendapatan: Gaji, Bonus, Freelance, Transfer, Hadiah, Investasi, Bisnis, Pendapatan Lainnya
+
+Format JSON (gunakan jumlah ${extractedAmount}):
+{
+  "klasifikasi": "${type === 'keluar' ? 'Pengeluaran' : 'Pendapatan'}",
+  "kategori": "kategori_yang_sesuai",
+  "jumlah": ${extractedAmount},
+  "keterangan": "deskripsi_tanpa_angka",
+  "tanggal": "${currentDate}"
+}`;
+    } else {
+      // Fallback ke prompt original jika gagal extract
+      enhancedPrompt = `
 Analisis transaksi berikut dan berikan output JSON:
 
 Transaksi: "${message}"
@@ -913,18 +949,18 @@ Format JSON:
   "jumlah": jumlah_dalam_angka,
   "keterangan": "deskripsi_singkat",
   "tanggal": "${currentDate}"
-}
-    `;
+}`;
+    }
 
     const completion = await groq.chat.completions.create({
       messages: [
         {
           role: "system",
-          content: "You are a financial transaction classifier. Return ONLY valid JSON."
+          content: "You are a financial transaction classifier. Return ONLY valid JSON. Follow the amount instruction strictly."
         },
         {
           role: "user",
-          content: prompt
+          content: enhancedPrompt
         }
       ],
       model: "llama3-8b-8192",
@@ -951,13 +987,26 @@ Format JSON:
     try {
       parsed = JSON.parse(response);
     } catch (parseError) {
+      console.error('JSON parse error:', parseError);
       return await fallbackClassification(message, type, currentDate);
     }
 
+    // 🔥 SOLUSI 2: Double-check dan paksakan amount yang benar
+    if (extractedAmount !== null && parsed.jumlah !== extractedAmount) {
+      console.warn(`AI returned wrong amount: ${parsed.jumlah}, forcing to: ${extractedAmount}`);
+      parsed.jumlah = extractedAmount;
+    }
+
+    // Validasi
     if (!parsed.klasifikasi || !parsed.kategori || !parsed.jumlah || !parsed.keterangan || !parsed.tanggal) {
+      console.error('Missing required fields:', parsed);
       return await fallbackClassification(message, type, currentDate);
     }
 
+    // 🔥 SOLUSI 3: Ensure jumlah is number
+    parsed.jumlah = parseInt(parsed.jumlah) || 0;
+
+    console.log('Final classification result:', parsed);
     return { success: true, data: parsed };
 
   } catch (error) {
@@ -965,6 +1014,31 @@ Format JSON:
     const currentDate = new Date().toISOString().split('T')[0];
     return await fallbackClassification(message, type, currentDate);
   }
+}
+
+// 🔥 FUNGSI BARU: Extract amount dari pesan yang sudah dinormalisasi
+function extractAmountFromMessage(message) {
+  console.log('Extracting amount from:', message);
+  
+  // Cari angka murni yang sudah dinormalisasi (biasanya angka besar)
+  const numberMatches = message.match(/\b\d+\b/g);
+  
+  if (numberMatches) {
+    console.log('Found numbers:', numberMatches);
+    
+    // Ambil angka terbesar (kemungkinan hasil normalisasi)
+    const numbers = numberMatches.map(num => parseInt(num)).filter(num => !isNaN(num));
+    const maxNumber = Math.max(...numbers);
+    
+    // Jika ada angka > 1000, kemungkinan hasil normalisasi
+    if (maxNumber >= 1000) {
+      console.log('Selected amount:', maxNumber);
+      return maxNumber;
+    }
+  }
+  
+  console.log('No valid amount found');
+  return null;
 }
 
 // Fungsi untuk memproses multiple transaksi
