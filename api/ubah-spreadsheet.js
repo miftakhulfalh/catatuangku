@@ -32,7 +32,7 @@ export default async function handler(req, res) {
 
   try {
     const { data: users, error } = await supabase
-      .from('users_duplicate')
+      .from('users')
       .select('chat_id, spreadsheet_link');
 
     if (error) throw error;
