@@ -40,8 +40,9 @@ export default async function handler(req, res) {
       const { data, error } = await supabase
         .from('users_duplicate')
         .select('chat_id, spreadsheet_link')
-        .eq('chat_id', chat_id)
+        .eq('chat_id', Number(chat_id)) // atau .eq('chat_id', chat_id.trim()) jika string
         .single();
+
 
       if (error || !data) {
         return res.status(404).json({ error: 'User tidak ditemukan' });
