@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     if (chat_id) {
       // Mode per-user
       const { data, error } = await supabase
-        .from('users_duplicate')
+        .from('users')
         .select('chat_id, spreadsheet_link')
         .eq('chat_id', Number(chat_id)) // atau .eq('chat_id', chat_id.trim()) jika string
         .single();
