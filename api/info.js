@@ -8,26 +8,13 @@ const supabase = createClient(
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
 const NOTIFICATION_MESSAGE = `
-<b>📢 Update 2025-06-28: Multiple Transaction</b>
+<b>📢 Update 2025-07-03: Menambahkan Sheet Rekap</b>
 
-Kini bot bisa memproses multiple transaction atau banyak pengeluaran/pendapatan dalam satu pesan.
-Anda dapat menggunakannya dg cara:
+🆕 Kami telah menambahkan sheet baru: REKAP di spreadsheet Anda. 
 
-1. Dengan separator "dan" 
-Contoh:
-<blockquote>/keluar makan bakso 20rb dan parkir 2rb</blockquote>
+Sheet ini berguna untuk melihat rekapitulasi pendapatan dan pengeluaran per bulan. Anda dapat memilih filter Bulan dan Tahun untuk melihat rekapnya.
 
-2. Dengan separator koma (,)
-Contoh:
-<blockquote>/masuk gaji 2jt, uang saku 500rb, freelance desain 100rb</blockquote>
-
-3. Dengan separator new line (enter)
-Contoh:
-<blockquote>/keluar nonton bioskop 40rb
-makan 55rb
-parkir 7rb</blockquote>
-
-Note: cukup pakai 1 perintah /keluar untuk separator new line (enter)
+Pilih menu 'Buka Spreadsheet' di bawah untuk melihat perubahan di spreadsheet Anda.
 
 Ada saran pengembangan lain? Chat ke @catatanuangku_helper
 
