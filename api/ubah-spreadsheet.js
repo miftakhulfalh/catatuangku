@@ -47,8 +47,32 @@ export default async function handler(req, res) {
           failed++;
           continue;
         }
-
-        // Step 1: Copy sheet from template to user's spreadsheet
+    
+        // STEP 0: Cek apakah sheet bernama "REKAP" sudah ada → hapus jika ada
+        const meta = await sheets.spreadsheets.get({
+          spreadsheetId: targetSpreadsheetId
+        });
+    
+        const rekapSheet = meta.data.sheets.find(
+          s => s.properties.title === 'REKAP'
+        );
+    
+        if (rekapSheet) {
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: targetSpreadsheetId,
+            requestBody: {
+              requests: [
+                {
+                  deleteSheet: {
+                    sheetId: rekapSheet.properties.sheetId
+                  }
+                }
+              ]
+            }
+          });
+        }
+    
+        // STEP 1: Copy sheet dari template
         const copyResponse = await sheets.spreadsheets.sheets.copyTo({
           spreadsheetId: TEMPLATE_SPREADSHEET_ID,
           sheetId: TEMPLATE_SHEET_ID,
@@ -56,10 +80,10 @@ export default async function handler(req, res) {
             destinationSpreadsheetId: targetSpreadsheetId
           }
         });
-
+    
         const newSheetId = copyResponse.data.sheetId;
-
-        // Step 2: Rename the copied sheet to "REKAP"
+    
+        // STEP 2: Rename sheet hasil copy jadi "REKAP"
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId: targetSpreadsheetId,
           requestBody: {
@@ -76,13 +100,14 @@ export default async function handler(req, res) {
             ]
           }
         });
-
+    
         success++;
       } catch (err) {
         console.error('Gagal proses user:', user.chat_id, err.message);
         failed++;
       }
     }
+
 
     return res.status(200).json({
       message: `✅ Sheet berhasil dicopy & diubah ke ${success} user. ❌ Gagal di ${failed} user.`
