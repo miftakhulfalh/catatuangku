@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     if (chat_id) {
       // Mode per-user
       const { data, error } = await supabase
-        .from('users')
+        .from('users_duplicate')
         .select('chat_id, spreadsheet_link')
         .eq('chat_id', Number(chat_id)) // atau .eq('chat_id', chat_id.trim()) jika string
         .single();
@@ -52,7 +52,7 @@ export default async function handler(req, res) {
     } else {
       // Mode batch
       const { data, error } = await supabase
-        .from('users')
+        .from('users_duplicate')
         .select('chat_id, spreadsheet_link')
         .range(offset, offset + batchSize - 1);
 
