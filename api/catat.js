@@ -908,8 +908,8 @@ PENTING: Gunakan jumlah ${extractedAmount} yang sudah saya berikan. JANGAN parse
 
 Instruksi:
 1. WAJIB gunakan jumlah: ${extractedAmount}
-2. Tentukan kategori yang sesuai
-3. Ekstrak keterangan/deskripsi (hapus angka dari keterangan)
+2. Tentukan dan pilih salah satu kategori yang sesuai
+3. Buat keterangan/deskripsi singkat (hapus angka dari keterangan)
 4. Jika tidak ada tanggal dalam pesan, gunakan tanggal hari ini: ${currentDate}
 
 Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Kesehatan, PDAM, Pulsa, Kuota, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
@@ -934,8 +934,8 @@ Tipe: "${type === 'keluar' ? 'Pengeluaran' : 'Pendapatan'}"
 
 Instruksi:
 1. Ekstrak jumlah uang (konversi rb=×1000, jt=×1000000)
-2. Tentukan kategori yang sesuai
-3. Ekstrak keterangan/deskripsi
+2. Tentukan dan pilih salah satu kategori yang sesuai
+3. Buat keterangan/deskripsi singkat
 4. Jika tidak ada tanggal dalam pesan, gunakan tanggal hari ini: ${currentDate}
 
 Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Kesehatan, PDAM, Pulsa, Kuota, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
