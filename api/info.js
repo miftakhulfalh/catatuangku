@@ -16,6 +16,10 @@ Sheet ini berguna untuk melihat rekapitulasi pendapatan dan pengeluaran per bula
 
 Pilih menu 'Buka Spreadsheet' di bawah untuk melihat perubahan di spreadsheet Anda.
 
+Note:
+- Jika spreadsheet Anda yang belum ada sheet 'REKAP' bisa chat ke @catatanuangku_helper.
+- Jika ada sheet dengan nama 'Copy of REKAP' bisa dihapus manual, gunakan saja sheet 'REKAP'
+
 Ada saran pengembangan lain? Chat ke @catatanuangku_helper
 
 Klik /start jika menu tidak muncul. 
