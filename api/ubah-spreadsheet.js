@@ -6,11 +6,9 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY
 );
 
-// 🔧 Ganti ini dengan template sheet yang kamu punya
-const TEMPLATE_SPREADSHEET_ID = '1RhcbhF8_7KfFf8USC3zo_9PvE8BFq50b0dGsnsZ5w_g'; // ID spreadsheet sumber
-const TEMPLATE_SHEET_ID = 1015531701; // ID sheet sumber yang ingin dicopy (bisa dapat dari metadata)
+const TEMPLATE_SPREADSHEET_ID = '1RhcbhF8_7KfFf8USC3zo_9PvE8BFq50b0dGsnsZ5w_g'; // Ganti dengan ID spreadsheet template kamu
+const TEMPLATE_SHEET_ID = 1015531701; // Ganti dengan sheetId dari sheet template (misal 0 untuk sheet pertama)
 
-// Setup auth service account
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -30,12 +28,36 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  try {
-    const { data: users, error } = await supabase
-      .from('users')
-      .select('chat_id, spreadsheet_link');
+  const { chat_id } = req.query;
+  const offset = parseInt(req.query.offset || '0', 10);
+  const batchSize = 20;
 
-    if (error) throw error;
+  try {
+    let users = [];
+
+    if (chat_id) {
+      // Mode per-user
+      const { data, error } = await supabase
+        .from('users_duplicate')
+        .select('chat_id, spreadsheet_link')
+        .eq('chat_id', chat_id)
+        .single();
+
+      if (error || !data) {
+        return res.status(404).json({ error: 'User tidak ditemukan' });
+      }
+
+      users.push(data);
+    } else {
+      // Mode batch
+      const { data, error } = await supabase
+        .from('users')
+        .select('chat_id, spreadsheet_link')
+        .range(offset, offset + batchSize - 1);
+
+      if (error) throw error;
+      users = data;
+    }
 
     let success = 0;
     let failed = 0;
@@ -47,16 +69,17 @@ export default async function handler(req, res) {
           failed++;
           continue;
         }
-    
-        // STEP 0: Cek apakah sheet bernama "REKAP" sudah ada → hapus jika ada
+
+        // Cek apakah sheet "REKAP" sudah ada
         const meta = await sheets.spreadsheets.get({
           spreadsheetId: targetSpreadsheetId
         });
-    
+
         const rekapSheet = meta.data.sheets.find(
           s => s.properties.title === 'REKAP'
         );
-    
+
+        // Hapus jika sudah ada
         if (rekapSheet) {
           await sheets.spreadsheets.batchUpdate({
             spreadsheetId: targetSpreadsheetId,
@@ -71,8 +94,8 @@ export default async function handler(req, res) {
             }
           });
         }
-    
-        // STEP 1: Copy sheet dari template
+
+        // Copy sheet dari template
         const copyResponse = await sheets.spreadsheets.sheets.copyTo({
           spreadsheetId: TEMPLATE_SPREADSHEET_ID,
           sheetId: TEMPLATE_SHEET_ID,
@@ -80,10 +103,10 @@ export default async function handler(req, res) {
             destinationSpreadsheetId: targetSpreadsheetId
           }
         });
-    
+
         const newSheetId = copyResponse.data.sheetId;
-    
-        // STEP 2: Rename sheet hasil copy jadi "REKAP"
+
+        // Rename sheet jadi "REKAP"
         await sheets.spreadsheets.batchUpdate({
           spreadsheetId: targetSpreadsheetId,
           requestBody: {
@@ -100,29 +123,29 @@ export default async function handler(req, res) {
             ]
           }
         });
-    
+
         success++;
       } catch (err) {
-        console.error('Gagal proses user:', user.chat_id, err.message);
+        console.error(`❌ Gagal proses ${user.chat_id}:`, err.message);
         failed++;
       }
     }
 
-
     return res.status(200).json({
-      message: `✅ Sheet berhasil dicopy & diubah ke ${success} user. ❌ Gagal di ${failed} user.`
+      message: `✅ ${success} sukses, ❌ ${failed} gagal.`,
+      mode: chat_id ? 'per-user' : 'batch',
+      processed: users.length
     });
 
   } catch (err) {
-    console.error('Fatal error:', err);
+    console.error('Fatal error:', err.message);
     return res.status(500).json({
-      error: 'Gagal memproses',
+      error: 'Gagal memproses permintaan',
       detail: err.message
     });
   }
 }
 
-// Fungsi untuk ekstrak spreadsheetId dari link
 function extractSpreadsheetId(url) {
   const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
   return match ? match[1] : null;
