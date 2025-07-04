@@ -912,7 +912,7 @@ Instruksi:
 3. Buat keterangan/deskripsi singkat (hapus angka dari keterangan)
 4. Jika tidak ada tanggal dalam pesan, gunakan tanggal hari ini: ${currentDate}
 
-Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Kesehatan, PDAM, Pulsa, Kuota, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
+Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Donasi, Hiburan, Kesehatan, PDAM, Pulsa, Kuota, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
 
 Kategori Pendapatan: Gaji, Bonus, Freelance, Transfer, Hadiah, Investasi, Bisnis, Pendapatan Lainnya
 
@@ -938,7 +938,7 @@ Instruksi:
 3. Buat keterangan/deskripsi singkat
 4. Jika tidak ada tanggal dalam pesan, gunakan tanggal hari ini: ${currentDate}
 
-Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Kesehatan, PDAM, Pulsa, Kuota, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
+Kategori Pengeluaran: Makanan, Minuman, Transportasi, Kendaraan, Belanja, Hiburan, Donasi, Kesehatan, PDAM, Pulsa, Kuota, Pendidikan, Listrik, Tagihan, Utilitas, Pengeluaran Lainnya
 
 Kategori Pendapatan: Gaji, Bonus, Freelance, Transfer, Hadiah, Investasi, Bisnis, Pendapatan Lainnya
 
