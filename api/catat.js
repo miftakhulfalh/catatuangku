@@ -644,8 +644,12 @@ ${transactionData.confidence === 'low' ? '⚠️ *Catatan:* Keyakinan rendah, pe
 // Fungsi untuk menganalisis teks struk dengan AI
 async function analyzeReceiptText(ocrText) {
   try {
-    const currentDate = new Date().toISOString().split('T')[0];
-    
+    const currentDate = new Date().toLocaleDateString('id-ID', {
+  timeZone: 'Asia/Jakarta',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+}).split('/').reverse().join('-')
     const prompt = `
 Analisis teks struk/invoice berikut dan ekstrak informasi keuangan dalam format JSON:
 
@@ -888,7 +892,13 @@ function normalizeTransactionAmount(transaction) {
 // Modifikasi fungsi classifyTransaction untuk handle single transaction lebih sederhana
 async function classifySingleTransaction(message, type) {
   try {
-    const currentDate = new Date().toISOString().split('T')[0];
+    const currentDate = new Date().toLocaleDateString('id-ID', {
+  timeZone: 'Asia/Jakarta',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+}).split('/').reverse().join('-')
+
     
     // Pre-extract amount sebelum dikirim ke AI
     const extractedAmount = extractAmountFromMessage(message);
